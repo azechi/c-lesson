@@ -9,10 +9,18 @@ enum TokenType { NUMBER, SPACE };
 
 int parse_one(int c, int *out_val, int *out_type);
 
+void test_parse_one_123();
+void test_parse_one_123_456();
+
 int main() {
     int answer1 = 0;
     int answer2 = 0;
 
+    // UnitTest
+    test_parse_one_123();
+    test_parse_one_123_456();
+
+    cl_getc_set_src("123 456");
     // write something here.
     int c = EOF;
     int out_val;
@@ -30,14 +38,6 @@ int main() {
 
     } while (c != EOF);
 
-    /*
-    // sample for cl_getc() usage.
-    int c;
-
-    while((c = cl_getc()) != EOF) {
-        printf("%c\n",c );
-    }
-    */
 
     // verity result.
     assert(answer1 == 123);
@@ -82,3 +82,44 @@ int parse_one(int c, int *out_val, int *out_type){
     return d;
 
 }
+
+void test_parse_one_123() {
+
+    cl_getc_set_src("123");
+
+    int c, v, t;
+
+    c = parse_one(EOF, &v, &t);
+
+    assert(c == EOF);
+    assert(v == 123);
+    assert(t == NUMBER);
+
+}
+
+void test_parse_one_123_456() {
+
+    cl_getc_set_src("123 456");
+
+    int c, v, t;
+
+    c = parse_one(EOF, &v, &t);
+    
+    assert(c == ' ');
+    assert(v == 123);
+    assert(t == NUMBER);
+
+    c = parse_one(c, &v, &t);
+
+    assert(c == '4');
+    assert(v == ' ');
+    assert(t == SPACE);
+    
+    c = parse_one(c, &v, &t);
+
+    assert(c == EOF);
+    assert(v == 456);
+    assert(t == NUMBER);
+
+}
+

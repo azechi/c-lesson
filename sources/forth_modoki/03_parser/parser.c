@@ -79,8 +79,7 @@ int parse_one(int prev_ch, struct Token *out_token) {
         buf[i++] = prev_ch;
 
         while (('a' <= ch && ch <= 'z')
-                || ('0' <= ch && ch <= '9')
-                || '/' == ch) {
+                || ('0' <= ch && ch <= '9')) {
             buf[i++] = ch;
             ch = cl_getc();
         }
@@ -88,6 +87,23 @@ int parse_one(int prev_ch, struct Token *out_token) {
 
         char* name = malloc_copy_str(i + 1, buf);
         out_token->ltype = EXECUTABLE_NAME;
+        out_token->u.name = name;
+    } else if (prev_ch == '/' && 'a' <= ch && ch <= 'z') {
+        char buf[NAME_SIZE];
+        int i = 0;
+
+        buf[i++] = ch;
+        ch = cl_getc();
+
+        while (('a' <= ch && ch <= 'z')
+                || ('0' <= ch && ch <= '9')) {
+            buf[i++] = ch;
+            ch = cl_getc();
+        }
+        buf[i] = '\0';
+
+        char* name = malloc_copy_str(i + 1, buf);
+        out_token->ltype = LITERAL_NAME;
         out_token->u.name = name;
     } else {
         out_token->ltype = UNKNOWN;

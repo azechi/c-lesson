@@ -184,11 +184,29 @@ static void test_parse_one_executable_name() {
     assert(strcmp(expect_name, actual.u.name) == 0);
 }
 
+static void test_parse_one_literal_name() {
+    char* input = "/add";
+    int expect_type = LITERAL_NAME;
+    char* expect_name = "add";
+
+    struct Token actual = {UNKNOWN, {0}};
+    int ch;
+
+    cl_getc_set_src(input);
+
+    ch = parse_one(EOF, &actual);
+
+    assert(EOF == ch);
+    assert(expect_type == actual.ltype);
+    assert(strcmp(expect_name, actual.u.name) == 0);
+}
+
 
 static void unit_tests() {
     test_parse_one_empty_should_return_END_OF_FILE();
     test_parse_one_number();
     test_parse_one_executable_name();
+    test_parse_one_literal_name();
 }
 
 int main() {

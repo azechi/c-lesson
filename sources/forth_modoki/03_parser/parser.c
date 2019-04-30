@@ -105,6 +105,12 @@ int parse_one(int prev_ch, struct Token *out_token) {
         char* name = malloc_copy_str(i + 1, buf);
         out_token->ltype = LITERAL_NAME;
         out_token->u.name = name;
+    } else if (prev_ch == '{') {
+        out_token->ltype = OPEN_CURLY;
+        out_token->u.onechar = '{';
+    } else if (prev_ch == '}') {
+        out_token->ltype = CLOSE_CURLY;
+        out_token->u.onechar = '}';
     } else {
         out_token->ltype = UNKNOWN;
     }
@@ -236,7 +242,7 @@ static void test_parse_one_open_curly() {
 
 static void test_parse_one_close_curly() {
     char* input = "}";
-    int expect_type = OPEN_CURLY;
+    int expect_type = CLOSE_CURLY;
     char expect_onechar = '}';
 
     struct Token actual = {UNKNOWN, {0}};

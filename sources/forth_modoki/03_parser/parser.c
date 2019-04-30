@@ -28,19 +28,16 @@ struct Token {
 
 #define NAME_SIZE 256
 
-int charsize_to_blocksize(int size, int unit) {
-    return (size + unit - 1) / unit;
-}
 
-char* malloc_copy_str(int len, char* src) {
-    assert(len > 0);
+char* malloc_copy_str(int size, char* src) {
+    assert(size > 0);
 
-    char* dest = (char*)malloc(charsize_to_blocksize(len, sizeof(size_t)));
+    char* dest = (char*)malloc(size);
 
     do {
-        dest[len] = src[len];
+        dest[size] = src[size];
 
-    } while (len--);
+    } while (size--);
 
     return dest;
 }
@@ -191,6 +188,25 @@ static void test_parse_one_number() {
     assert(expect == token.u.number);
 }
 
+static void test_malloc_copy_str_empty() {
+    int input_size = 1;
+    char* input_str = "";
+
+    char* actual = malloc_copy_str(input_size, input_str);
+
+    assert(actual != input_str);
+    assert(strcmp(actual, input_str) == 0);
+}
+
+static void test_malloc_copy_str() {
+    int input_size = 3;
+    char* input_str = "ab";
+
+    char* actual = malloc_copy_str(input_size, input_str);
+
+    assert(actual != input_str);
+    assert(strcmp(actual, input_str) == 0);
+}
 
 static void test_parse_one_executable_name() {
     char* input = "add";
@@ -260,25 +276,12 @@ static void test_parse_one_close_curly() {
     assert(expect_onechar == actual.u.onechar);
 }
 
-static void test_charsize_to_blocksize() {
-
-    int unit = 1;
-    assert(charsize_to_blocksize(0, unit) == 0);
-    assert(charsize_to_blocksize(1, unit) == 1);
-    assert(charsize_to_blocksize(2, unit) == 2);
-
-    unit = 2;
-
-    assert(charsize_to_blocksize(0, unit) == 0);
-    assert(charsize_to_blocksize(1, unit) == 1);
-    assert(charsize_to_blocksize(2, unit) == 1);
-}
-
 static void unit_tests() {
     test_parse_one_empty_should_return_END_OF_FILE();
     test_parse_one_number();
-    
-    test_charsize_to_blocksize();
+
+    test_malloc_copy_str_empty();
+    test_malloc_copy_str();
 
     test_parse_one_executable_name();
     test_parse_one_literal_name();

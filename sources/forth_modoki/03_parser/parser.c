@@ -29,6 +29,20 @@ struct Token {
 #define NAME_SIZE 256
 
 
+char* malloc_copy_str(int len, char* src) {
+    assert(len > 0);
+
+    char* dest = (char*)malloc((len + sizeof(size_t)) / sizeof(size_t));
+
+    do {
+        dest[len] = src[len];
+
+    } while (len--);
+
+    return dest;
+}
+
+
 int parse_one(int prev_ch, struct Token *out_token) {
     int ch;
 
@@ -58,6 +72,23 @@ int parse_one(int prev_ch, struct Token *out_token) {
 
         out_token->ltype = SPACE;
         out_token->u.onechar  = ' ';
+    } else if ('a' <= prev_ch && prev_ch <= 'z') {
+        char buf[NAME_SIZE];
+        int i = 0;
+
+        buf[i++] = prev_ch;
+
+        while (('a' <= ch && ch <= 'z')
+                || ('0' <= ch && ch <= '9')
+                || '/' == ch) {
+            buf[i++] = ch;
+            ch = cl_getc();
+        }
+        buf[i] = '\0';
+
+        char* name = malloc_copy_str(i + 1, buf);
+        out_token->ltype = EXECUTABLE_NAME;
+        out_token->u.name = name;
     } else {
         out_token->ltype = UNKNOWN;
     }
@@ -150,7 +181,7 @@ static void test_parse_one_executable_name() {
 
     assert(EOF == ch);
     assert(expect_type == actual.ltype);
-    assert(expect_name == actual.u.name);
+    assert(strcmp(expect_name, actual.u.name) == 0);
 }
 
 

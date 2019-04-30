@@ -11,14 +11,14 @@ int main() {
 
     // write something here.
     int* ans[] = {&answer1, &answer2, &answer3};
-    int p = 0;
+    int pos = 0;
  
     const char* i = input;
     int acm = 0;
     
     while(*i) {
         if(*i == ' '){
-            *ans[p++] = acm;
+            *ans[pos++] = acm;
             acm = 0;
 
             while(*++i == ' ')
@@ -32,7 +32,7 @@ int main() {
         i++;
     }
 
-    *ans[p] = acm;
+    *ans[pos] = acm;
 
     // verity result.
     assert(answer1 == 123);

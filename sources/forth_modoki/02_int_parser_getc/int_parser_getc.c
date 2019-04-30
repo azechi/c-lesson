@@ -46,30 +46,30 @@ int main() {
     return 1;
 }
 
-int parse_one(int c, int *out_val, int *out_type){
+int parse_one(int prev_ch, int *out_val, int *out_type){
     
-    int d;
+    int ch;
 
-    if (c == EOF){
-        c = cl_getc();
+    if (prev_ch == EOF){
+        prev_ch = cl_getc();
     }
-    d = cl_getc();
+    ch = cl_getc();
 
-    if (('0' <= c && c <= '9')){
+    if (('0' <= prev_ch && prev_ch <= '9')){
 
-        int acm = c - '0';
+        int acm = prev_ch - '0';
 
-        while('0' <= d && d <= '9'){
-            acm = acm * 10 + d - '0';
-            d = cl_getc();
+        while('0' <= ch && ch <= '9'){
+            acm = acm * 10 + ch - '0';
+            ch = cl_getc();
         }
 
         *out_type = NUMBER;
         *out_val = acm;
-    } else if (c == ' ') {
+    } else if (prev_ch == ' ') {
 
-        while(d == ' '){
-            d = cl_getc();
+        while(ch == ' '){
+            ch = cl_getc();
         }
     
         *out_type = SPACE;
@@ -79,7 +79,7 @@ int parse_one(int c, int *out_val, int *out_type){
         *out_val = EOF;
     }
         
-    return d;
+    return ch;
 
 }
 

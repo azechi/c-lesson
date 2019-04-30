@@ -105,8 +105,19 @@ void parser_print_all() {
 }
 
 
+static void test_parse_one_empty_should_return_END_OF_FILE() {
+    char *input = "";
+    int expect = END_OF_FILE;
 
+    struct Token token = {UNKNOWN, {0}};
+    int ch;
 
+    cl_getc_set_src(input);
+    ch = parse_one(EOF, &token);
+
+    assert(ch == EOF);
+    assert(token.ltype == expect);
+}
 
 static void test_parse_one_number() {
     char *input = "123";
@@ -124,24 +135,29 @@ static void test_parse_one_number() {
     assert(expect == token.u.number);
 }
 
-static void test_parse_one_empty_should_return_END_OF_FILE() {
-    char *input = "";
-    int expect = END_OF_FILE;
 
-    struct Token token = {UNKNOWN, {0}};
+static void test_parse_one_executable_name() {
+    char* input = "add";
+    int expect_type = EXECUTABLE_NAME;
+    char* expect_name = "add";
+
+    struct Token actual = {UNKNOWN, {0}};
     int ch;
 
     cl_getc_set_src(input);
-    ch = parse_one(EOF, &token);
 
-    assert(ch == EOF);
-    assert(token.ltype == expect);
+    ch = parse_one(EOF, &actual);
+
+    assert(EOF == ch);
+    assert(expect_type == actual.ltype);
+    assert(expect_name == actual.u.name);
 }
 
 
 static void unit_tests() {
     test_parse_one_empty_should_return_END_OF_FILE();
     test_parse_one_number();
+    test_parse_one_executable_name();
 }
 
 int main() {

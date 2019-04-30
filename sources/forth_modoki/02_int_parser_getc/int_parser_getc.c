@@ -27,13 +27,13 @@ int main() {
     int out_type;
 
     int* ans[] = {&answer1, &answer2};
-    int p = 0;
+    int pos = 0;
     
     do {
 
         c = parse_one(c, &out_val, &out_type);
         if (out_type == NUMBER){
-            *ans[p++] = out_val; 
+            *ans[pos++] = out_val; 
         }
 
     } while (c != EOF);

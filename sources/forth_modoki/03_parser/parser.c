@@ -217,12 +217,48 @@ static void test_parse_one_literal_name() {
     assert(strcmp(expect_name, actual.u.name) == 0);
 }
 
+static void test_parse_one_open_curly() {
+    char* input = "{";
+    int expect_type = OPEN_CURLY;
+    char expect_onechar = '{';
+
+    struct Token actual = {UNKNOWN, {0}};
+    int ch;
+
+    cl_getc_set_src(input);
+
+    ch = parse_one(EOF, &actual);
+
+    assert(EOF == ch);
+    assert(expect_type == actual.ltype);
+    assert(expect_onechar == actual.u.onechar);
+}
+
+static void test_parse_one_close_curly() {
+    char* input = "}";
+    int expect_type = OPEN_CURLY;
+    char expect_onechar = '}';
+
+    struct Token actual = {UNKNOWN, {0}};
+    int ch;
+
+    cl_getc_set_src(input);
+
+    ch = parse_one(EOF, &actual);
+
+    assert(EOF == ch);
+    assert(expect_type == actual.ltype);
+    assert(expect_onechar == actual.u.onechar);
+}
+
 
 static void unit_tests() {
     test_parse_one_empty_should_return_END_OF_FILE();
     test_parse_one_number();
     test_parse_one_executable_name();
     test_parse_one_literal_name();
+    test_parse_one_open_curly();
+    test_parse_one_close_curly();
 }
 
 int main() {

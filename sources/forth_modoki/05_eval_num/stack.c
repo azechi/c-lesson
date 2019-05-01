@@ -120,8 +120,9 @@ static void test_stack_push_push_pop_pop() {
 }
 
 
-int main() {
-
+__attribute__((unused))
+static void test_all() {
+    stack_clear();
     test_token_equals();
 
     stack_clear();
@@ -143,6 +144,12 @@ int main() {
     stack_push(&(struct Token){LITERAL_NAME, .u.name = "some2"});
 
     stack_print_all();
+}
+
+#if 0
+int main() {
+    test_all();
 
     return 1;
 }
+#endif

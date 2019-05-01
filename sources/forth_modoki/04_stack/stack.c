@@ -28,6 +28,23 @@ static void stack_clear() {
     sp = 0;
 }
 
+static void stack_print_all() {
+    struct Token *t;
+    while((t = stack_pop())) {
+        switch(t->ltype) {
+            case NUMBER:
+                printf("num: %d\n", t->u.number);
+                break;
+            case LITERAL_NAME:
+                printf("LITERAL_NAME: %s\n", t->u.name);
+                break;
+            default:
+                printf("Unknown type %d\n", t->ltype);
+                break;
+        }
+    }
+}
+
 static int token_equals(const struct Token t1, const struct Token t2) {
     if(t1.ltype == t2.ltype) {
         switch(t1.ltype) {
@@ -118,6 +135,14 @@ int main() {
 
     stack_clear();
     test_stack_push_push_pop_pop();
+
+
+    stack_push(&(struct Token){NUMBER, .u.number = 123});
+    stack_push(&(struct Token){NUMBER, .u.number = 45});
+    stack_push(&(struct Token){LITERAL_NAME, .u.name = "some"});
+    stack_push(&(struct Token){LITERAL_NAME, .u.name = "some2"});
+
+    stack_print_all();
 
     return 1;
 }

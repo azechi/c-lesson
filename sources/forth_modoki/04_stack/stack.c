@@ -24,6 +24,10 @@ void stack_push(const struct Token *token) {
     }
 }
 
+static void stack_clear() {
+    sp = 0;
+}
+
 static int token_equals(const struct Token t1, const struct Token t2) {
     if(t1.ltype == t2.ltype) {
         switch(t1.ltype) {
@@ -56,7 +60,6 @@ static void test_token_equals() {
 }
 
 static void test_stack_pop() {
-
     struct Token *actual = stack_pop();
 
     assert(actual == NULL);
@@ -72,11 +75,32 @@ static void test_stack_push() {
 }
 
 static void test_stack_push_pop() {
-    //assert(0);
+    struct Token input = {0};
+
+    struct Token actual;
+
+    stack_push(&input);
+    actual = *stack_pop();
+
+    assert(sp == 0);
+    assert(token_equals(actual, input));
 }
 
 static void test_stack_push_push_pop_pop() {
-    //assert(0);
+    struct Token input_1 = {NUMBER, {0}};
+    struct Token input_2 = {NUMBER, {1}};
+
+    struct Token actual_1;
+    struct Token actual_2;
+
+    stack_push(&input_1);
+    stack_push(&input_2);
+    actual_1 = *stack_pop();
+    actual_2 = *stack_pop();
+
+    assert(sp == 0);
+    assert(token_equals(actual_1, input_1));
+    assert(token_equals(actual_2, input_2));
 }
 
 
@@ -84,10 +108,18 @@ int main() {
 
     test_token_equals();
 
+    stack_clear();
     test_stack_pop();
+
+    stack_clear();
     test_stack_push();
+
+    stack_clear();
     test_stack_push_pop();
+
+    stack_clear();
     test_stack_push_push_pop_pop();
+
 
     return 1;
 }

@@ -14,9 +14,10 @@ struct Token {
 };
 
 /*
-    return NULL if stack empty and out_token is NULL
+    return NULL if stack empty
 */
 struct Token *stack_pop();
 
-void stack_push(const struct Token token);
+
+void stack_push(const struct Token *token);
 

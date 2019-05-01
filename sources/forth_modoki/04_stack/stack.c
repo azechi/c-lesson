@@ -90,17 +90,16 @@ static void test_stack_push_push_pop_pop() {
     struct Token input_1 = {NUMBER, {0}};
     struct Token input_2 = {NUMBER, {1}};
 
-    struct Token actual_1;
-    struct Token actual_2;
+    struct Token actual;
 
     stack_push(&input_1);
     stack_push(&input_2);
-    actual_1 = *stack_pop();
-    actual_2 = *stack_pop();
 
-    assert(sp == 0);
-    assert(token_equals(actual_1, input_1));
-    assert(token_equals(actual_2, input_2));
+    actual = *stack_pop();
+    assert(token_equals(actual, input_2));
+
+    actual = *stack_pop();
+    assert(token_equals(actual, input_1));
 }
 
 
@@ -119,7 +118,6 @@ int main() {
 
     stack_clear();
     test_stack_push_push_pop_pop();
-
 
     return 1;
 }

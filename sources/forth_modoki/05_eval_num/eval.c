@@ -2,7 +2,6 @@
 #include <string.h>
 #include "clesson.h"
 
-static int STACKUNDERFLOW = 0;
 static int TYPECHECK = 0;
 
 static int streq(char *s1, char *s2) {
@@ -11,10 +10,6 @@ static int streq(char *s1, char *s2) {
 
 static int stack_pop_number_value() {
     struct Element *el = stack_pop();
-    if(!el){
-        assert(STACKUNDERFLOW);
-    }
-
     if(ELEMENT_NUMBER != el->etype){
         assert(TYPECHECK);
     }

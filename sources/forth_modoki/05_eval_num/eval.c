@@ -48,15 +48,12 @@ static void test_eval_num_two() {
     int expect2 = 123;
 
     cl_getc_set_src(input);
+    stack_clear();
 
     eval();
 
-    /* TODO: write code to pop stack top and second top element */
-    int actual1 = 0;
-    int actual2 = 0;
-
-    assert(expect1 == actual1);
-    assert(expect2 == actual2);
+    assert_equals_element_number(expect1, stack_pop());
+    assert_equals_element_number(expect2, stack_pop());
 }
 
 

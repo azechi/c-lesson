@@ -1,6 +1,11 @@
 #include <assert.h>
+#include <string.h>
 #include "clesson.h"
 
+
+static int streq(char *s1, char *s2) {
+    return (strcmp(s1, s2) == 0);
+}
 
 void eval() {
     int ch = EOF;
@@ -16,30 +21,39 @@ void eval() {
                 case LEX_NUMBER:
                     stack_push((struct Element*)&token);
                     break;
+                case LEX_EXECUTABLE_NAME:
+                    if(streq(token.u.name, "add")){
+                        int i1 = stack_pop()->u.number;
+                        int i2 = stack_pop()->u.number;
+                        struct Element el = {ELEMENT_NUMBER, .u.number = i1 + i2};
+                        stack_push(&el);
+                    }
+                    break;
                 default:
                     break;
             }
         }
     } while(ch != EOF);
-
-
 }
 
-static void assert_equals_element_number(int expect, struct Element *el) {
-    assert(NULL != el);
-    assert(ELEMENT_NUMBER == el->etype);
-    assert(expect == el->u.number);
+
+static int verify_element_number(int expect, struct Element *el) {
+    return (el
+            && ELEMENT_NUMBER == el->etype
+            && expect == el->u.number);
 }
+
 
 static void test_eval_num_one() {
     char *input = "123";
+    int expect = 123;
 
     cl_getc_set_src(input);
     stack_clear();
 
     eval();
 
-    assert_equals_element_number(123, stack_pop());
+    assert(verify_element_number(expect, stack_pop()));
 }
 
 static void test_eval_num_two() {
@@ -52,8 +66,8 @@ static void test_eval_num_two() {
 
     eval();
 
-    assert_equals_element_number(expect1, stack_pop());
-    assert_equals_element_number(expect2, stack_pop());
+    assert(verify_element_number(expect1, stack_pop()));
+    assert(verify_element_number(expect2, stack_pop()));
 }
 
 
@@ -62,12 +76,11 @@ static void test_eval_num_add() {
     int expect = 3;
 
     cl_getc_set_src(input);
+    stack_clear();
 
     eval();
 
-    /* TODO: write code to pop stack top element */
-    int actual = 0;
-    assert(expect == actual);
+    assert(verify_element_number(expect, stack_pop()));
 }
 
 

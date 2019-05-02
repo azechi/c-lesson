@@ -1,12 +1,31 @@
 #include <assert.h>
-#include "stack.h"
 #include "clesson.h"
 
 
 void eval() {
+    int ch = EOF;
+    struct Token token = {
+        LEX_UNKNOWN,
+        {0}
+    };
+
+    do {
+        ch = parse_one(ch, &token);
+        if(token.ltype != LEX_UNKNOWN) {
+            switch(token.ltype) {
+                case LEX_NUMBER:
+                    stack_push((struct Element*)&token);
+                    break;
+                default:
+                    break;
+            }
+        }
+    } while(ch != EOF);
+
+
 }
 
-static void assert_element_number(int expect, struct Element *el) {
+static void assert_equals_element_number(int expect, struct Element *el) {
     assert(NULL != el);
     assert(ELEMENT_NUMBER == el->etype);
     assert(expect == el->u.number);
@@ -16,10 +35,11 @@ static void test_eval_num_one() {
     char *input = "123";
 
     cl_getc_set_src(input);
+    stack_clear();
 
     eval();
 
-    assert_element_number(123, stack_pop());
+    assert_equals_element_number(123, stack_pop());
 }
 
 static void test_eval_num_two() {
@@ -55,13 +75,8 @@ static void test_eval_num_add() {
 
 
 int main() {
-    stack_clear();
     test_eval_num_one();
-
-    stack_clear();
     test_eval_num_two();
-
-    stack_clear();
     test_eval_num_add();
 
     return 0;

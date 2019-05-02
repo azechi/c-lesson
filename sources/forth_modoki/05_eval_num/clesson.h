@@ -21,6 +21,20 @@ struct Token {
     } u;
 };
 
+enum ElementType {
+    ELEMENT_NUMBER = LEX_NUMBER,
+    ELEMENT_LITERAL_NAME = LEX_LITERAL_NAME
+};
+
+struct Element {
+    enum ElementType etype;
+    union {
+        int number;
+        char *name;
+    } u;
+};
+
+
 /*
 return one character and move cursor.
 return EOF if end of file.
@@ -29,3 +43,13 @@ int cl_getc();
 void cl_getc_set_src(char* str);
 
 int parse_one(int prev_ch, struct Token *out_token);
+
+
+/*
+    return NULL if stack empty
+*/
+struct Element *stack_pop();
+
+void stack_push(const struct Element *token);
+
+void stack_clear();

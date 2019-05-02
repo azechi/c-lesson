@@ -2,7 +2,6 @@
 #include <string.h>
 #include "clesson.h"
 
-static int NOTIMPLEMENTED = 0;
 static int STACKUNDERFLOW = 0;
 static int TYPECHECK = 0;
 
@@ -46,15 +45,24 @@ void eval() {
                     }
                     break;
                 case LEX_SPACE:
-                    break;
+                case LEX_END_OF_FILE:
                 default:
-                    assert(NOTIMPLEMENTED);
                     break;
             }
         }
     } while(ch != EOF);
 }
 
+static void test_eval_empty() {
+    char *input = "";
+
+    cl_getc_set_src(input);
+    stack_clear();
+
+    eval();
+
+    assert(NULL == stack_pop());
+}
 
 static void test_eval_num_one() {
     char *input = "123";
@@ -96,6 +104,7 @@ static void test_eval_num_add() {
 
 
 int main() {
+    test_eval_empty();
     test_eval_num_one();
     test_eval_num_two();
     test_eval_num_add();

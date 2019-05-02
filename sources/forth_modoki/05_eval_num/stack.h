@@ -6,7 +6,7 @@ enum ElementType {
 };
 
 struct Element {
-    enum ElementType ltype;
+    enum ElementType etype;
     union {
         int number;
         char *name;
@@ -18,6 +18,6 @@ struct Element {
 */
 struct Element *stack_pop();
 
-
 void stack_push(const struct Element *token);
 
+void stack_clear();

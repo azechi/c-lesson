@@ -24,14 +24,14 @@ void stack_push(const struct Element *token) {
     }
 }
 
-static void stack_clear() {
+void stack_clear() {
     sp = 0;
 }
 
 static void stack_print_all() {
     struct Element *t;
     while((t = stack_pop())) {
-        switch(t->ltype) {
+        switch(t->etype) {
             case ELEMENT_NUMBER:
                 printf("num: %d\n", t->u.number);
                 break;
@@ -39,15 +39,15 @@ static void stack_print_all() {
                 printf("ELEMENT_LITERAL_NAME: %s\n", t->u.name);
                 break;
             default:
-                printf("Unknown type %d\n", t->ltype);
+                printf("Unknown type %d\n", t->etype);
                 break;
         }
     }
 }
 
 static int token_equals(const struct Element t1, const struct Element t2) {
-    if(t1.ltype == t2.ltype) {
-        switch(t1.ltype) {
+    if(t1.etype == t2.etype) {
+        switch(t1.etype) {
             case ELEMENT_NUMBER:
                 return (t1.u.number == t2.u.number);
             case ELEMENT_LITERAL_NAME:

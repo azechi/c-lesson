@@ -56,13 +56,6 @@ void eval() {
 }
 
 
-static int verify_element_number(int expect, struct Element *el) {
-    return (el
-            && ELEMENT_NUMBER == el->etype
-            && expect == el->u.number);
-}
-
-
 static void test_eval_num_one() {
     char *input = "123";
     int expect = 123;
@@ -72,7 +65,7 @@ static void test_eval_num_one() {
 
     eval();
 
-    assert(verify_element_number(expect, stack_pop()));
+    assert(expect == stack_pop_number_value());
 }
 
 static void test_eval_num_two() {
@@ -85,8 +78,8 @@ static void test_eval_num_two() {
 
     eval();
 
-    assert(verify_element_number(expect1, stack_pop()));
-    assert(verify_element_number(expect2, stack_pop()));
+    assert(expect1 == stack_pop_number_value());
+    assert(expect2 == stack_pop_number_value());
 }
 
 
@@ -98,8 +91,7 @@ static void test_eval_num_add() {
     stack_clear();
 
     eval();
-
-    assert(verify_element_number(expect, stack_pop()));
+    assert(expect == stack_pop_number_value());
 }
 
 
@@ -112,8 +104,7 @@ int main() {
     stack_clear();
 
     eval();
-
-    assert(verify_element_number(45, stack_pop()));
+    assert(45 == stack_pop_number_value());
 
     return 0;
 }

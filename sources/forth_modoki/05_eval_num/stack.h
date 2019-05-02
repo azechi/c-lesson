@@ -1,12 +1,12 @@
 #include <stdio.h>
 
-enum LexicalType {
-    NUMBER,
-    LITERAL_NAME
+enum ElementType {
+    ELEMENT_NUMBER,
+    ELEMENT_LITERAL_NAME
 };
 
-struct Token {
-    enum LexicalType ltype;
+struct Element {
+    enum ElementType ltype;
     union {
         int number;
         char *name;
@@ -16,8 +16,8 @@ struct Token {
 /*
     return NULL if stack empty
 */
-struct Token *stack_pop();
+struct Element *stack_pop();
 
 
-void stack_push(const struct Token *token);
+void stack_push(const struct Element *token);
 

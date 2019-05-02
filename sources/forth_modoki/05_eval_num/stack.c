@@ -5,10 +5,10 @@
 
 #define STACK_SIZE 1024
 
-static struct Token stack[STACK_SIZE];
-static int sp = 0; // stack pointer
+static struct Element stack[STACK_SIZE];
+static int sp = 0; /* stack pointer */
 
-struct Token *stack_pop() {
+struct Element *stack_pop() {
     if(sp > 0) {
         return &stack[--sp];
     }
@@ -16,7 +16,7 @@ struct Token *stack_pop() {
     return NULL;
 }
 
-void stack_push(const struct Token *token) {
+void stack_push(const struct Element *token) {
     assert(sp < STACK_SIZE);
 
     if(sp < STACK_SIZE) {
@@ -29,14 +29,14 @@ static void stack_clear() {
 }
 
 static void stack_print_all() {
-    struct Token *t;
+    struct Element *t;
     while((t = stack_pop())) {
         switch(t->ltype) {
-            case NUMBER:
+            case ELEMENT_NUMBER:
                 printf("num: %d\n", t->u.number);
                 break;
-            case LITERAL_NAME:
-                printf("LITERAL_NAME: %s\n", t->u.name);
+            case ELEMENT_LITERAL_NAME:
+                printf("ELEMENT_LITERAL_NAME: %s\n", t->u.name);
                 break;
             default:
                 printf("Unknown type %d\n", t->ltype);
@@ -45,12 +45,12 @@ static void stack_print_all() {
     }
 }
 
-static int token_equals(const struct Token t1, const struct Token t2) {
+static int token_equals(const struct Element t1, const struct Element t2) {
     if(t1.ltype == t2.ltype) {
         switch(t1.ltype) {
-            case NUMBER:
+            case ELEMENT_NUMBER:
                 return (t1.u.number == t2.u.number);
-            case LITERAL_NAME:
+            case ELEMENT_LITERAL_NAME:
                 return (strcmp(t1.u.name, t2.u.name) == 0);
             default:
                 return 0;
@@ -62,12 +62,12 @@ static int token_equals(const struct Token t1, const struct Token t2) {
 /* unit tests */
 
 static void test_token_equals() {
-    struct Token input_number_0 = {NUMBER, {0}};
-    struct Token input_number_0_0 = {NUMBER, {0}};
-    struct Token input_number_1 = {NUMBER, {1}};
-    struct Token input_literal_name_0 = {LITERAL_NAME, .u.name = "a"};
-    struct Token input_literal_name_0_0 = {LITERAL_NAME, .u.name = "a"};
-    struct Token input_literal_name_1 = {LITERAL_NAME, .u.name = "b"};
+    struct Element input_number_0 = {ELEMENT_NUMBER, {0}};
+    struct Element input_number_0_0 = {ELEMENT_NUMBER, {0}};
+    struct Element input_number_1 = {ELEMENT_NUMBER, {1}};
+    struct Element input_literal_name_0 = {ELEMENT_LITERAL_NAME, .u.name = "a"};
+    struct Element input_literal_name_0_0 = {ELEMENT_LITERAL_NAME, .u.name = "a"};
+    struct Element input_literal_name_1 = {ELEMENT_LITERAL_NAME, .u.name = "b"};
 
     assert(token_equals(input_number_0, input_number_0_0));
     assert(!token_equals(input_number_0, input_number_1));
@@ -77,13 +77,13 @@ static void test_token_equals() {
 }
 
 static void test_stack_pop() {
-    struct Token *actual = stack_pop();
+    struct Element *actual = stack_pop();
 
     assert(actual == NULL);
 }
 
 static void test_stack_push() {
-    struct Token input = {0};
+    struct Element input = {0};
 
     stack_push(&input);
 
@@ -92,9 +92,9 @@ static void test_stack_push() {
 }
 
 static void test_stack_push_pop() {
-    struct Token input = {0};
+    struct Element input = {0};
 
-    struct Token actual;
+    struct Element actual;
 
     stack_push(&input);
     actual = *stack_pop();
@@ -104,10 +104,10 @@ static void test_stack_push_pop() {
 }
 
 static void test_stack_push_push_pop_pop() {
-    struct Token input_1 = {NUMBER, {0}};
-    struct Token input_2 = {NUMBER, {1}};
+    struct Element input_1 = {ELEMENT_NUMBER, {0}};
+    struct Element input_2 = {ELEMENT_NUMBER, {1}};
 
-    struct Token actual;
+    struct Element actual;
 
     stack_push(&input_1);
     stack_push(&input_2);
@@ -138,10 +138,10 @@ static void test_all() {
     test_stack_push_push_pop_pop();
 
 
-    stack_push(&(struct Token){NUMBER, .u.number = 123});
-    stack_push(&(struct Token){NUMBER, .u.number = 45});
-    stack_push(&(struct Token){LITERAL_NAME, .u.name = "some"});
-    stack_push(&(struct Token){LITERAL_NAME, .u.name = "some2"});
+    stack_push(&(struct Element){ELEMENT_NUMBER, .u.number = 123});
+    stack_push(&(struct Element){ELEMENT_NUMBER, .u.number = 45});
+    stack_push(&(struct Element){ELEMENT_LITERAL_NAME, .u.name = "some"});
+    stack_push(&(struct Element){ELEMENT_LITERAL_NAME, .u.name = "some2"});
 
     stack_print_all();
 }

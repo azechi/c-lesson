@@ -1,5 +1,5 @@
-#include "clesson.h"
 #include <string.h>
+#include "clesson.h"
 
 static const char* input = "123 456";
 static int pos = 0;

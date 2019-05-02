@@ -1,8 +1,10 @@
 #include <assert.h>
-#include "clesson.h"
 #include "stack.h"
+#include "clesson.h"
 
-void eval() {}
+
+void eval() {
+}
 
 static void assert_element_number(int expect, struct Element *el) {
     assert(NULL != el);

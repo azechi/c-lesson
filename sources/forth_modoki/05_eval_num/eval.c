@@ -2,9 +2,25 @@
 #include <string.h>
 #include "clesson.h"
 
+static int NOTIMPLEMENTED = 0;
+static int STACKUNDERFLOW = 0;
+static int TYPECHECK = 0;
 
 static int streq(char *s1, char *s2) {
     return (strcmp(s1, s2) == 0);
+}
+
+static int stack_pop_number_value() {
+    struct Element *el = stack_pop();
+    if(!el){
+        assert(STACKUNDERFLOW);
+    }
+
+    if(ELEMENT_NUMBER != el->etype){
+        assert(TYPECHECK);
+    }
+
+    return el->u.number;
 }
 
 void eval() {
@@ -23,13 +39,16 @@ void eval() {
                     break;
                 case LEX_EXECUTABLE_NAME:
                     if(streq(token.u.name, "add")){
-                        int i1 = stack_pop()->u.number;
-                        int i2 = stack_pop()->u.number;
+                        int i1 = stack_pop_number_value();
+                        int i2 = stack_pop_number_value();
                         struct Element el = {ELEMENT_NUMBER, .u.number = i1 + i2};
                         stack_push(&el);
                     }
                     break;
+                case LEX_SPACE:
+                    break;
                 default:
+                    assert(NOTIMPLEMENTED);
                     break;
             }
         }
@@ -88,6 +107,13 @@ int main() {
     test_eval_num_one();
     test_eval_num_two();
     test_eval_num_add();
+
+    cl_getc_set_src("1 2 3 add add 4 5 6 7 8 9 add add add add add add");
+    stack_clear();
+
+    eval();
+
+    assert(verify_element_number(45, stack_pop()));
 
     return 0;
 }

@@ -2,6 +2,8 @@
 #include <string.h>
 #include "clesson.h"
 
+static int NOTIMPLEMENTED = 0;
+static int STACKUNDERFLOW = 0;
 static int TYPECHECK = 0;
 
 static int streq(char *s1, char *s2) {
@@ -10,6 +12,10 @@ static int streq(char *s1, char *s2) {
 
 static int stack_pop_number_value() {
     struct Element *el = stack_pop();
+    if(!el){
+        assert(STACKUNDERFLOW);
+    }
+
     if(ELEMENT_NUMBER != el->etype){
         assert(TYPECHECK);
     }
@@ -40,24 +46,22 @@ void eval() {
                     }
                     break;
                 case LEX_SPACE:
-                case LEX_END_OF_FILE:
+                    break;
                 default:
+                    assert(NOTIMPLEMENTED);
                     break;
             }
         }
     } while(ch != EOF);
 }
 
-static void test_eval_empty() {
-    char *input = "";
 
-    cl_getc_set_src(input);
-    stack_clear();
-
-    eval();
-
-    assert(NULL == stack_pop());
+static int verify_element_number(int expect, struct Element *el) {
+    return (el
+            && ELEMENT_NUMBER == el->etype
+            && expect == el->u.number);
 }
+
 
 static void test_eval_num_one() {
     char *input = "123";
@@ -68,7 +72,7 @@ static void test_eval_num_one() {
 
     eval();
 
-    assert(expect == stack_pop_number_value());
+    assert(verify_element_number(expect, stack_pop()));
 }
 
 static void test_eval_num_two() {
@@ -81,8 +85,8 @@ static void test_eval_num_two() {
 
     eval();
 
-    assert(expect1 == stack_pop_number_value());
-    assert(expect2 == stack_pop_number_value());
+    assert(verify_element_number(expect1, stack_pop()));
+    assert(verify_element_number(expect2, stack_pop()));
 }
 
 
@@ -94,12 +98,12 @@ static void test_eval_num_add() {
     stack_clear();
 
     eval();
-    assert(expect == stack_pop_number_value());
+
+    assert(verify_element_number(expect, stack_pop()));
 }
 
 
 int main() {
-    test_eval_empty();
     test_eval_num_one();
     test_eval_num_two();
     test_eval_num_add();
@@ -108,7 +112,8 @@ int main() {
     stack_clear();
 
     eval();
-    assert(45 == stack_pop_number_value());
+
+    assert(verify_element_number(45, stack_pop()));
 
     return 0;
 }

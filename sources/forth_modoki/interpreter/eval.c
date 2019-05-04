@@ -117,13 +117,18 @@ static void test_eval_num_add() {
     assert(expect == stack_pop_number_value());
 }
 
-
-int main() {
+__attribute__((unused))
+static void test_all() {
     test_pop_number_value();
     test_eval_empty();
     test_eval_num_one();
     test_eval_num_two();
     test_eval_num_add();
+}
+
+#if 0
+int main() {
+    test_all();
 
     cl_getc_set_src("1 2 3 add add 4 5 6 7 8 9 add add add add add add");
     stack_clear();
@@ -134,3 +139,4 @@ int main() {
 
     return 0;
 }
+#endif 

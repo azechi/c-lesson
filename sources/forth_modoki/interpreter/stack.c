@@ -16,11 +16,11 @@ struct Element *stack_pop() {
     return NULL;
 }
 
-void stack_push(const struct Element *token) {
+void stack_push(const struct Element *el) {
     assert(sp < STACK_SIZE);
 
     if(sp < STACK_SIZE) {
-        stack[sp++] = *token;
+        stack[sp++] = *el;
     }
 }
 
@@ -29,29 +29,29 @@ void stack_clear() {
 }
 
 static void stack_print_all() {
-    struct Element *t;
-    while((t = stack_pop())) {
-        switch(t->etype) {
+    struct Element *el;
+    while((el = stack_pop())) {
+        switch(el->etype) {
             case ELEMENT_NUMBER:
-                printf("num: %d\n", t->u.number);
+                printf("num: %d\n", el->u.number);
                 break;
             case ELEMENT_LITERAL_NAME:
-                printf("ELEMENT_LITERAL_NAME: %s\n", t->u.name);
+                printf("ELEMENT_LITERAL_NAME: %s\n", el->u.name);
                 break;
             default:
-                printf("Unknown type %d\n", t->etype);
+                printf("Unknown type %d\n", el->etype);
                 break;
         }
     }
 }
 
-static int token_equals(const struct Element t1, const struct Element t2) {
-    if(t1.etype == t2.etype) {
-        switch(t1.etype) {
+static int token_equals(const struct Element e1, const struct Element e2) {
+    if(e1.etype == e2.etype) {
+        switch(e1.etype) {
             case ELEMENT_NUMBER:
-                return (t1.u.number == t2.u.number);
+                return (e1.u.number == e2.u.number);
             case ELEMENT_LITERAL_NAME:
-                return (strcmp(t1.u.name, t2.u.name) == 0);
+                return (strcmp(e1.u.name, e2.u.name) == 0);
             default:
                 return 0;
         }

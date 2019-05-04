@@ -17,7 +17,7 @@ static int stack_pop_number_value() {
     }
 
     if(ELEMENT_NUMBER != el->etype){
-        assert_fail("TYPECHECK");
+        assert_fail("NOT NUMBER ELEMENT");
     }
 
     return el->u.number;
@@ -49,7 +49,7 @@ void eval() {
                 case LEX_END_OF_FILE:
                     break;
                 default:
-                    assert_fail("NOTIMPLEMENTED");
+                    assert_fail("NOT IMPLEMENTED");
                     break;
             }
         }

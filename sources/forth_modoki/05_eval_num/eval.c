@@ -2,9 +2,9 @@
 #include <string.h>
 #include "clesson.h"
 
-static int NOTIMPLEMENTED = 0;
-static int STACKUNDERFLOW = 0;
-static int TYPECHECK = 0;
+
+#define assert_fail(msg) assert(0&&(msg))
+
 
 static int streq(char *s1, char *s2) {
     return (strcmp(s1, s2) == 0);
@@ -13,11 +13,11 @@ static int streq(char *s1, char *s2) {
 static int stack_pop_number_value() {
     struct Element *el = stack_pop();
     if(!el){
-        assert(STACKUNDERFLOW);
+        assert_fail("STACKUNDERFLOW");
     }
 
     if(ELEMENT_NUMBER != el->etype){
-        assert(TYPECHECK);
+        assert_fail("TYPECHECK");
     }
 
     return el->u.number;
@@ -48,7 +48,7 @@ void eval() {
                 case LEX_SPACE:
                     break;
                 default:
-                    assert(NOTIMPLEMENTED);
+                    assert_fail("NOTIMPLEMENTED");
                     break;
             }
         }

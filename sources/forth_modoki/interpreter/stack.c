@@ -45,7 +45,7 @@ static void stack_print_all() {
     }
 }
 
-static int token_equals(const struct Element e1, const struct Element e2) {
+static int element_equals(const struct Element e1, const struct Element e2) {
     if(e1.etype == e2.etype) {
         switch(e1.etype) {
             case ELEMENT_NUMBER:
@@ -61,7 +61,7 @@ static int token_equals(const struct Element e1, const struct Element e2) {
 
 /* unit tests */
 
-static void test_token_equals() {
+static void test_element_equals() {
     struct Element input_number_0 = {ELEMENT_NUMBER, {0}};
     struct Element input_number_0_0 = {ELEMENT_NUMBER, {0}};
     struct Element input_number_1 = {ELEMENT_NUMBER, {1}};
@@ -69,11 +69,11 @@ static void test_token_equals() {
     struct Element input_literal_name_0_0 = {ELEMENT_LITERAL_NAME, .u.name = "a"};
     struct Element input_literal_name_1 = {ELEMENT_LITERAL_NAME, .u.name = "b"};
 
-    assert(token_equals(input_number_0, input_number_0_0));
-    assert(!token_equals(input_number_0, input_number_1));
+    assert(element_equals(input_number_0, input_number_0_0));
+    assert(!element_equals(input_number_0, input_number_1));
 
-    assert(token_equals(input_literal_name_0, input_literal_name_0_0));
-    assert(!token_equals(input_literal_name_0, input_literal_name_1));
+    assert(element_equals(input_literal_name_0, input_literal_name_0_0));
+    assert(!element_equals(input_literal_name_0, input_literal_name_1));
 }
 
 static void test_stack_pop() {
@@ -88,7 +88,7 @@ static void test_stack_push() {
     stack_push(&input);
 
     assert(sp == 1);
-    assert(token_equals(stack[0], input));
+    assert(element_equals(stack[0], input));
 }
 
 static void test_stack_push_pop() {
@@ -100,7 +100,7 @@ static void test_stack_push_pop() {
     actual = *stack_pop();
 
     assert(sp == 0);
-    assert(token_equals(actual, input));
+    assert(element_equals(actual, input));
 }
 
 static void test_stack_push_push_pop_pop() {
@@ -113,17 +113,17 @@ static void test_stack_push_push_pop_pop() {
     stack_push(&input_2);
 
     actual = *stack_pop();
-    assert(token_equals(actual, input_2));
+    assert(element_equals(actual, input_2));
 
     actual = *stack_pop();
-    assert(token_equals(actual, input_1));
+    assert(element_equals(actual, input_1));
 }
 
 
 __attribute__((unused))
 static void test_all() {
     stack_clear();
-    test_token_equals();
+    test_element_equals();
 
     stack_clear();
     test_stack_pop();

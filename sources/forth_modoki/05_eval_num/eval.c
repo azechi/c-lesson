@@ -46,6 +46,7 @@ void eval() {
                     }
                     break;
                 case LEX_SPACE:
+                case LEX_END_OF_FILE:
                     break;
                 default:
                     assert_fail("NOTIMPLEMENTED");
@@ -64,6 +65,17 @@ static void test_pop_number_value() {
     stack_push(&input);
 
     assert(expect == stack_pop_number_value());
+}
+
+static void test_eval_empty() {
+    char *input = "";
+
+    cl_getc_set_src(input);
+    stack_clear();
+
+    eval();
+
+    assert(NULL == stack_pop());
 }
 
 static void test_eval_num_one() {
@@ -108,6 +120,7 @@ static void test_eval_num_add() {
 
 int main() {
     test_pop_number_value();
+    test_eval_empty();
     test_eval_num_one();
     test_eval_num_two();
     test_eval_num_add();

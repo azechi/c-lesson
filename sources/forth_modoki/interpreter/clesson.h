@@ -35,6 +35,9 @@ struct Element {
 };
 
 
+int element_equals(const struct Element e1, const struct Element e2);
+
+
 /*
 return one character and move cursor.
 return EOF if end of file.
@@ -53,4 +56,14 @@ struct Element *stack_pop();
 void stack_push(const struct Element *el);
 
 void stack_clear();
+
+/*
+return 1 if key exists
+return 0 if key not exists
+*/
+int dict_get(char* key, struct Element *out_el);
+
+void dict_put(char* key, struct Element *el);
+
+void dict_print_all();
 

@@ -41,8 +41,23 @@ int dict_get(char* key, struct Element *out_el) {
     return 0;
 }
 
-void dict_print_ll() {
-    assert(0);
+void dict_print_all() {
+    int i;
+    struct KeyValue item;
+    for(i =0; i < dict_pos; i++) {
+        item = dict_array[i];
+        switch(item.value.etype) {
+            case ELEMENT_NUMBER:
+                printf("KEY: %s NUMBER: %d\n", item.key, item.value.u.number);
+                break;
+            case ELEMENT_LITERAL_NAME:
+                printf("KEY: %s LITERAL_NAME: %s\n", item.key, item.value.u.name);
+                break;
+            default:
+                printf("KEY: %s UNKNOWN TYPE %d\n", item.key, item.value.etype);
+                break;
+        }
+    }
 }
 
 void dict_clear() {

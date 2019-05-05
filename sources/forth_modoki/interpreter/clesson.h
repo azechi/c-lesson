@@ -1,4 +1,7 @@
 #include <stdio.h>
+#include <string.h>
+
+int streq(char *s1, char *s2);
 
 enum LexicalType {
     LEX_NUMBER,
@@ -64,6 +67,8 @@ return 0 if key not exists
 int dict_get(char* key, struct Element *out_el);
 
 void dict_put(char* key, struct Element *el);
+
+void dict_clear();
 
 void dict_print_all();
 

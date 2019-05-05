@@ -6,10 +6,6 @@
 #define assert_fail(msg) assert(0&&(msg))
 
 
-static int streq(char *s1, char *s2) {
-    return (strcmp(s1, s2) == 0);
-}
-
 static int stack_pop_number_value() {
     struct Element *el = stack_pop();
     if(!el){

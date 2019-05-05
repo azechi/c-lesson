@@ -122,6 +122,7 @@ static void test_dict_overwrite() {
     assert(element_equals(expect, actual));
 }
 
+__attribute__((unused))
 static void test_all() {
     test_dict_key_not_exists();
     test_dict_key_exists();
@@ -130,10 +131,11 @@ static void test_all() {
     test_dict_overwrite();
 }
 
-
+#if 0
 int main() {
 
     test_all();
 
     return 0;
 }
+#endif

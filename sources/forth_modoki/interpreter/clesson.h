@@ -54,7 +54,7 @@ int parse_one(int prev_ch, struct Token *out_token);
 /*
     return NULL if stack empty
 */
-struct Element *stack_pop();
+struct Element *try_stack_pop();
 
 void stack_push(const struct Element *el);
 

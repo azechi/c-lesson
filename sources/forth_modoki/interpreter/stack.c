@@ -8,7 +8,8 @@
 static struct Element stack[STACK_SIZE];
 static int sp = 0; /* stack pointer */
 
-struct Element *stack_pop() {
+
+struct Element *try_stack_pop() {
     if(sp > 0) {
         return &stack[--sp];
     }
@@ -30,7 +31,7 @@ void stack_clear() {
 
 static void stack_print_all() {
     struct Element *el;
-    while((el = stack_pop())) {
+    while((el = try_stack_pop())) {
         switch(el->etype) {
             case ELEMENT_NUMBER:
                 printf("num: %d\n", el->u.number);
@@ -48,8 +49,8 @@ static void stack_print_all() {
 
 /* unit tests */
 
-static void test_stack_pop() {
-    struct Element *actual = stack_pop();
+static void test_try_stack_pop() {
+    struct Element *actual = try_stack_pop();
 
     assert(actual == NULL);
 }
@@ -69,7 +70,7 @@ static void test_stack_push_pop() {
     struct Element actual;
 
     stack_push(&input);
-    actual = *stack_pop();
+    actual = *try_stack_pop();
 
     assert(sp == 0);
     assert(element_equals(actual, input));
@@ -84,10 +85,10 @@ static void test_stack_push_push_pop_pop() {
     stack_push(&input_1);
     stack_push(&input_2);
 
-    actual = *stack_pop();
+    actual = *try_stack_pop();
     assert(element_equals(actual, input_2));
 
-    actual = *stack_pop();
+    actual = *try_stack_pop();
     assert(element_equals(actual, input_1));
 }
 
@@ -95,7 +96,7 @@ static void test_stack_push_push_pop_pop() {
 __attribute__((unused))
 static void test_all() {
     stack_clear();
-    test_stack_pop();
+    test_try_stack_pop();
 
     stack_clear();
     test_stack_push();

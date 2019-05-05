@@ -1,22 +1,35 @@
 #include <assert.h>
-#include <string.h>
 #include "clesson.h"
 
 
 #define assert_fail(msg) assert(0&&(msg))
 
-
-static int stack_pop_number_value() {
-    struct Element *el = stack_pop();
+static struct Element *stack_pop() {
+    struct Element *el = try_stack_pop();
     if(!el){
         assert_fail("STACKUNDERFLOW");
     }
+    return el;
+}
+
+static int stack_pop_number_value() {
+    struct Element *el = stack_pop();
 
     if(ELEMENT_NUMBER != el->etype){
         assert_fail("NOT NUMBER ELEMENT");
     }
 
     return el->u.number;
+}
+
+static char *stack_pop_literal_name() {
+    struct Element *el = stack_pop();
+
+    if(ELEMENT_LITERAL_NAME != el->etype){
+        assert_fail("NOT LITERAL_NAME");
+    }
+
+    return el->u.name;
 }
 
 void eval() {
@@ -31,6 +44,7 @@ void eval() {
         if(token.ltype != LEX_UNKNOWN) {
             switch(token.ltype) {
                 case LEX_NUMBER:
+                case LEX_LITERAL_NAME:
                     stack_push((struct Element*)&token);
                     break;
                 case LEX_EXECUTABLE_NAME:
@@ -39,6 +53,15 @@ void eval() {
                         int i2 = stack_pop_number_value();
                         struct Element el = {ELEMENT_NUMBER, .u.number = i1 + i2};
                         stack_push(&el);
+                    } else if(streq(token.u.name, "def")) {
+                        struct Element *val = stack_pop();
+                        char *name = stack_pop_literal_name();
+                        dict_put(name, val);
+                    } else {
+                        struct Element el = {0};
+                        if(dict_get(token.u.name, &el)) {
+                            stack_push(&el);
+                        }
                     }
                     break;
                 case LEX_SPACE:
@@ -71,7 +94,7 @@ static void test_eval_empty() {
 
     eval();
 
-    assert(NULL == stack_pop());
+    assert(NULL == try_stack_pop());
 }
 
 static void test_eval_num_one() {
@@ -113,16 +136,64 @@ static void test_eval_num_add() {
     assert(expect == stack_pop_number_value());
 }
 
-__attribute__((unused))
-static void test_all() {
-    test_pop_number_value();
-    test_eval_empty();
-    test_eval_num_one();
-    test_eval_num_two();
-    test_eval_num_add();
+static void test_eval_literal_name() {
+    char *input = "/abc";
+    struct Element expect = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
+
+    cl_getc_set_src(input);
+    stack_clear();
+
+    eval();
+    assert(element_equals(expect, *stack_pop()));
 }
 
-#if 0
+static void assert_dict_contains(char *expect_key, struct Element *expect_el) {
+    struct Element actual = {0};
+
+    assert(dict_get(expect_key, &actual));
+    assert(element_equals(*expect_el, actual));
+}
+
+static void test_eval_def_dict_put() {
+    char *input = "/abc 123 def";
+    char *expect_key = "abc";
+    struct Element expect_el = {ELEMENT_NUMBER, .u.number = 123};
+
+    cl_getc_set_src(input);
+    stack_clear();
+    dict_clear();
+
+    eval();
+
+    assert_dict_contains(expect_key, &expect_el);
+}
+
+static void test_eval_def_dict_get() {
+    char *input = "/abc 123 def abc";
+    int expect = 123;
+
+    cl_getc_set_src(input);
+    stack_clear();
+    dict_clear();
+
+    eval();
+    assert(expect == stack_pop_number_value());
+}
+
+__attribute__((unused))
+    static void test_all() {
+        test_pop_number_value();
+        test_eval_empty();
+        test_eval_num_one();
+        test_eval_num_two();
+        test_eval_num_add();
+
+        test_eval_literal_name();
+        test_eval_def_dict_put();
+        test_eval_def_dict_get();
+    }
+
+#if 1
 int main() {
     test_all();
 
@@ -135,4 +206,4 @@ int main() {
 
     return 0;
 }
-#endif 
+#endif

@@ -75,12 +75,26 @@ void eval() {
     } while(ch != EOF);
 }
 
+static void env_init(char *input) {
+    cl_getc_set_src(input);
+    stack_clear();
+    dict_clear();
+}
+
+
+static void assert_dict_contains(char *expect_key, struct Element *expect_el) {
+    struct Element actual = {0};
+
+    assert(dict_get(expect_key, &actual));
+    assert(element_equals(*expect_el, actual));
+}
 
 static void test_pop_number_value() {
     struct Element input = {ELEMENT_NUMBER, {1}};
     int expect = 1;
 
-    stack_clear();
+    env_init("");
+
     stack_push(&input);
 
     assert(expect == stack_pop_number_value());
@@ -89,8 +103,7 @@ static void test_pop_number_value() {
 static void test_eval_empty() {
     char *input = "";
 
-    cl_getc_set_src(input);
-    stack_clear();
+    env_init(input);
 
     eval();
 
@@ -101,8 +114,7 @@ static void test_eval_num_one() {
     char *input = "123";
     int expect = 123;
 
-    cl_getc_set_src(input);
-    stack_clear();
+    env_init(input);
 
     eval();
 
@@ -114,8 +126,7 @@ static void test_eval_num_two() {
     int expect1 = 456;
     int expect2 = 123;
 
-    cl_getc_set_src(input);
-    stack_clear();
+    env_init(input);
 
     eval();
 
@@ -123,13 +134,11 @@ static void test_eval_num_two() {
     assert(expect2 == stack_pop_number_value());
 }
 
-
 static void test_eval_num_add() {
     char *input = "1 2 add";
     int expect = 3;
 
-    cl_getc_set_src(input);
-    stack_clear();
+    env_init(input);
 
     eval();
 
@@ -140,28 +149,19 @@ static void test_eval_literal_name() {
     char *input = "/abc";
     struct Element expect = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
 
-    cl_getc_set_src(input);
-    stack_clear();
+    env_init(input);
 
     eval();
     assert(element_equals(expect, *stack_pop()));
 }
 
-static void assert_dict_contains(char *expect_key, struct Element *expect_el) {
-    struct Element actual = {0};
-
-    assert(dict_get(expect_key, &actual));
-    assert(element_equals(*expect_el, actual));
-}
 
 static void test_eval_def_dict_put() {
     char *input = "/abc 123 def";
     char *expect_key = "abc";
     struct Element expect_el = {ELEMENT_NUMBER, .u.number = 123};
 
-    cl_getc_set_src(input);
-    stack_clear();
-    dict_clear();
+    env_init(input);
 
     eval();
 
@@ -172,9 +172,7 @@ static void test_eval_def_dict_get() {
     char *input = "/abc 123 def abc";
     int expect = 123;
 
-    cl_getc_set_src(input);
-    stack_clear();
-    dict_clear();
+    env_init(input);
 
     eval();
     assert(expect == stack_pop_number_value());
@@ -197,8 +195,7 @@ __attribute__((unused))
 int main() {
     test_all();
 
-    cl_getc_set_src("1 2 3 add add 4 5 6 7 8 9 add add add add add add");
-    stack_clear();
+    env_init("1 2 3 add add 4 5 6 7 8 9 add add add add add add");
 
     eval();
 

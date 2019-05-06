@@ -11,7 +11,9 @@ enum LexicalType {
     LEX_OPEN_CURLY,
     LEX_CLOSE_CURLY,
     LEX_END_OF_FILE,
-    LEX_UNKNOWN
+    LEX_UNKNOWN,
+
+    LEX_MAX = LEX_UNKNOWN
 };
 
 
@@ -26,7 +28,9 @@ struct Token {
 
 enum ElementType {
     ELEMENT_NUMBER = LEX_NUMBER,
-    ELEMENT_LITERAL_NAME = LEX_LITERAL_NAME
+    ELEMENT_LITERAL_NAME = LEX_LITERAL_NAME,
+
+    ELEMENT_C_FUNC = LEX_MAX + 1
 };
 
 struct Element {
@@ -34,6 +38,7 @@ struct Element {
     union {
         int number;
         char *name;
+        void (*cfunc)();
     } u;
 };
 
@@ -59,6 +64,8 @@ struct Element *try_stack_pop();
 void stack_push(const struct Element *el);
 
 void stack_clear();
+
+void stack_print_all();
 
 /*
 return 1 if key exists

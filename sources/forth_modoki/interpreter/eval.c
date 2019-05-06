@@ -32,6 +32,44 @@ static char *stack_pop_literal_name() {
     return el->u.name;
 }
 
+/* primitive */
+
+static void def_op() {
+    struct Element *val = stack_pop();
+    char *name = stack_pop_literal_name();
+    dict_put(name, val);
+}
+
+static void add_op() {
+    int res = stack_pop_number_value() + stack_pop_number_value();
+    stack_push(&(struct Element){ELEMENT_NUMBER, .u.number = res});
+}
+
+static void sub_op() {
+    int op2 = stack_pop_number_value();
+    int res = stack_pop_number_value() - op2;
+    stack_push(&(struct Element){ELEMENT_NUMBER, .u.number = res});
+}
+
+static void mul_op() {
+    int res = stack_pop_number_value() * stack_pop_number_value();
+    stack_push(&(struct Element){ELEMENT_NUMBER, .u.number = res});
+}
+
+static void div_op() {
+    int op2 = stack_pop_number_value();
+    int res = stack_pop_number_value() / op2;
+    stack_push(&(struct Element){ELEMENT_NUMBER, .u.number = res});
+}
+
+static void register_primitive() {
+    dict_put("add", &(struct Element){ELEMENT_C_FUNC, .u.cfunc = &add_op});
+    dict_put("def", &(struct Element){ELEMENT_C_FUNC, .u.cfunc = &def_op});
+    dict_put("sub", &(struct Element){ELEMENT_C_FUNC, .u.cfunc = &sub_op});
+    dict_put("mul", &(struct Element){ELEMENT_C_FUNC, .u.cfunc = &mul_op});
+    dict_put("div", &(struct Element){ELEMENT_C_FUNC, .u.cfunc = &div_op});
+}
+
 void eval() {
     int ch = EOF;
     struct Token token = {
@@ -48,19 +86,20 @@ void eval() {
                     stack_push((struct Element*)&token);
                     break;
                 case LEX_EXECUTABLE_NAME:
-                    if(streq(token.u.name, "add")){
-                        int i1 = stack_pop_number_value();
-                        int i2 = stack_pop_number_value();
-                        struct Element el = {ELEMENT_NUMBER, .u.number = i1 + i2};
-                        stack_push(&el);
-                    } else if(streq(token.u.name, "def")) {
-                        struct Element *val = stack_pop();
-                        char *name = stack_pop_literal_name();
-                        dict_put(name, val);
-                    } else {
+                    {
                         struct Element el = {0};
-                        if(dict_get(token.u.name, &el)) {
-                            stack_push(&el);
+                        if(!dict_get(token.u.name, &el)) {
+                            assert_fail("EXECUTABLE NAME NOT FOUND");
+                            break;
+                        }
+
+                        switch(el.etype) {
+                            case ELEMENT_C_FUNC:
+                                el.u.cfunc();
+                                break;
+                            default:
+                                stack_push(&el);
+                                break;
                         }
                     }
                     break;
@@ -79,6 +118,7 @@ static void env_init(char *input) {
     cl_getc_set_src(input);
     stack_clear();
     dict_clear();
+    register_primitive();
 }
 
 
@@ -178,6 +218,46 @@ static void test_eval_def_dict_get() {
     assert(expect == stack_pop_number_value());
 }
 
+static void test_eval_sub() {
+    char *input = "5 3 sub";
+    int expect = 2;
+
+    env_init(input);
+
+    eval();
+    assert(expect == stack_pop_number_value());
+}
+
+static void test_eval_mul() {
+    char *input = "2 4 mul";
+    int expect = 8;
+
+    env_init(input);
+
+    eval();
+    assert(expect == stack_pop_number_value());
+}
+
+static void test_eval_div() {
+    char *input = "6 2 div";
+    int expect = 3;
+
+    env_init(input);
+
+    eval();
+    assert(expect == stack_pop_number_value());
+}
+
+static void test_eval_div_truncation() {
+    char *input = "14 4 div";
+    int expect = 3;
+
+    env_init(input);
+
+    eval();
+    assert(expect == stack_pop_number_value());
+}
+
 __attribute__((unused))
     static void test_all() {
         test_pop_number_value();
@@ -189,6 +269,11 @@ __attribute__((unused))
         test_eval_literal_name();
         test_eval_def_dict_put();
         test_eval_def_dict_get();
+
+        test_eval_sub();
+        test_eval_mul();
+        test_eval_div();
+        test_eval_div_truncation();
     }
 
 #if 1

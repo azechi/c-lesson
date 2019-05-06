@@ -73,6 +73,9 @@ void dict_print_all() {
                 case ELEMENT_LITERAL_NAME:
                     printf("KEY: %s LITERAL_NAME: %s\n", head->key, head->value.u.name);
                     break;
+                case ELEMENT_C_FUNC:
+                    printf("KEY: %s C_FUNC: %p\n", head->key, head->value.u.cfunc);
+                    break;
                 default:
                     printf("KEY: %s UNKNOWN TYPE %d\n", head->key, head->value.etype);
                     break;

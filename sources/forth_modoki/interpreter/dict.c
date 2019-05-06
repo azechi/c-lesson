@@ -154,22 +154,24 @@ static void test_dict_append_key() {
 }
 
 static void test_dict_append_key_hash_collision() {
-    char *input_1 = "key";
-    char *input_2 = "kye"; /* depends on hashing algorithm */
-    char *expect_1 = "key";
-    char *expect_2 = "kye";
-
+    struct Element input_1 = {ELEMENT_LITERAL_NAME, .u.name = "xyz"};
+    struct Element input_2 = {ELEMENT_NUMBER, .u.number = 9};
+    struct Element expect_1 = {ELEMENT_LITERAL_NAME, .u.name = "xyz"};
+    struct Element expect_2 = {ELEMENT_NUMBER, .u.number = 9};
 
     dict_clear();
-    dict_put(input_1, &(struct Element){ELEMENT_NUMBER, .u.number = 1});
-    dict_put(input_2, &(struct Element){ELEMENT_NUMBER, .u.number = 2});
+    dict_put("key", &input_1);
+    dict_put("kye", &input_2); /* this key causes a hash collision that depends on hash algorithm */
 
-    struct Element dummy = {0};
+    struct Element actual_1 = {0};
+    struct Element actual_2 = {0};
+    int actual_key_exists_1 = dict_get("key", &actual_1);
+    int actual_key_eixsts_2 = dict_get("kye", &actual_2);
 
-    int actual_1 = dict_get(expect_1, &dummy);
-    int actual_2 = dict_get(expect_2, &dummy);
-
-    assert(actual_1 && actual_2);
+    assert(actual_key_exists_1
+            && actual_key_eixsts_2
+            && element_equals(expect_1, actual_1)
+            && element_equals(expect_2, actual_2));
 }
 
 static void test_dict_overwrite() {

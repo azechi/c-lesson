@@ -29,7 +29,7 @@ void stack_clear() {
     sp = 0;
 }
 
-static void stack_print_all() {
+void stack_print_all() {
     struct Element *el;
     while((el = try_stack_pop())) {
         switch(el->etype) {

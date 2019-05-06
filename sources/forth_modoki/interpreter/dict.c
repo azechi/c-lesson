@@ -173,9 +173,9 @@ static void test_dict_append_key_hash_collision() {
 }
 
 static void test_dict_overwrite() {
-    struct Element input_1 = {0};
-    struct Element input_2 = {0};
-    struct Element expect = {0};
+    struct Element input_1 = {ELEMENT_NUMBER, .u.number = 1};
+    struct Element input_2 = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
+    struct Element expect = {ELEMENT_LITERAL_NAME, .u.name= "abc"};
 
     dict_clear();
     dict_put("key", &input_1);

@@ -25,11 +25,21 @@ static int stack_pop_number_value() {
 static char *stack_pop_literal_name() {
     struct Element *el = stack_pop();
 
-    if(ELEMENT_LITERAL_NAME != el->etype){
+    if(ELEMENT_LITERAL_NAME != el->etype) {
         assert_fail("NOT LITERAL_NAME");
     }
 
     return el->u.name;
+}
+
+static struct ElementArray *stack_pop_exec_array() {
+    struct Element *el = stack_pop();
+
+    if(ELEMENT_EXEC_ARRAY != el->etype) {
+        assert_fail("NOT EXEC ARRAY");
+    }
+
+    return el->u.exec_array;
 }
 
 /* primitive */
@@ -258,6 +268,85 @@ static void test_eval_div_truncation() {
     assert(expect == stack_pop_number_value());
 }
 
+static void call_eval(char *input) {
+    env_init(input);
+    eval();
+}
+
+#define TO_EA(a) new_element_array(sizeof(a), a)
+
+static void test_eval_executable_array_num() {
+    char *input = "{1}";
+    struct Element expect[] = {
+        (struct Element){ELEMENT_NUMBER, .u.number = 1}
+    };
+
+    call_eval(input);
+    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+}
+
+static void test_eval_executable_array_literal_name() {
+    char *input = "{/abc}";
+    struct Element expect[] = {
+        (struct Element){ELEMENT_LITERAL_NAME, .u.name = "abc"}
+    };
+
+    call_eval(input);
+    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+}
+
+static void test_eval_executable_array_executable_name() {
+    char *input = "{abc}";
+    struct Element expect[] = {
+        (struct Element){ELEMENT_EXECUTABLE_NAME, .u.name = "abc"}
+    };
+
+    call_eval(input);
+    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+}
+
+static void test_eval_executable_array_multiple_elements() {
+    char *input = "{1 2}";
+    struct Element expect[] = {
+        (struct Element){ELEMENT_NUMBER, .u.number = 1},
+        (struct Element){ELEMENT_NUMBER, .u.number = 2}
+    };
+
+    call_eval(input);
+    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+}
+
+static void test_eval_executable_array_multiple_arrays() {
+    char *input = "{1} {2}";
+    struct Element expect1[] = {
+        (struct Element){ELEMENT_NUMBER, .u.number = 1}
+    };
+    struct Element expect2[] = {
+        (struct Element){ELEMENT_NUMBER, .u.number = 2}
+    };
+
+    call_eval(input);
+    assert(element_array_equals(TO_EA(expect1), stack_pop_exec_array()));
+    assert(element_array_equals(TO_EA(expect2), stack_pop_exec_array()));
+}
+
+static void test_eval_executable_array_nested() {
+    char *input = "{1 {2} 3}";
+    struct Element expect[] = {
+        (struct Element){ELEMENT_NUMBER, .u.number = 1},
+        (struct Element){ELEMENT_EXEC_ARRAY, .u.exec_array
+            = TO_EA(((struct Element [1]){
+                        (struct Element){ELEMENT_NUMBER, .u.number = 2}
+                        }))},
+        (struct Element){ELEMENT_NUMBER, .u.number = 3}
+    };
+
+    call_eval(input);
+    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+}
+
+#undef EA
+
 __attribute__((unused))
     static void test_all() {
         test_pop_number_value();
@@ -274,6 +363,13 @@ __attribute__((unused))
         test_eval_mul();
         test_eval_div();
         test_eval_div_truncation();
+
+        test_eval_executable_array_num();
+        test_eval_executable_array_literal_name();
+        test_eval_executable_array_executable_name();
+        test_eval_executable_array_multiple_elements();
+        test_eval_executable_array_multiple_arrays();
+        test_eval_executable_array_nested();
     }
 
 #if 1

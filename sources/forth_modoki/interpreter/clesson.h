@@ -28,9 +28,11 @@ struct Token {
 
 enum ElementType {
     ELEMENT_NUMBER = LEX_NUMBER,
+    ELEMENT_EXECUTABLE_NAME = LEX_EXECUTABLE_NAME,
     ELEMENT_LITERAL_NAME = LEX_LITERAL_NAME,
 
-    ELEMENT_C_FUNC = LEX_MAX + 1
+    ELEMENT_C_FUNC = LEX_MAX + 1,
+    ELEMENT_EXEC_ARRAY
 };
 
 struct Element {
@@ -39,12 +41,20 @@ struct Element {
         int number;
         char *name;
         void (*cfunc)();
+        struct ElementArray *exec_array;
     } u;
 };
 
-
 int element_equals(const struct Element e1, const struct Element e2);
 
+struct ElementArray {
+    int len;
+    struct Element elements[0];
+};
+
+struct ElementArray *new_element_array(int length, struct Element *elements);
+
+int element_array_equals(const struct ElementArray *e1, const struct ElementArray *e2);
 
 /*
 return one character and move cursor.

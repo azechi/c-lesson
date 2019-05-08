@@ -49,6 +49,12 @@ struct Element {
     } u;
 };
 
+struct Element element_number(int i);
+struct Element element_executable_name(char *s);
+struct Element element_literal_name(char *s);
+struct Element element_exec_array(struct ElementArray *ea);
+
+
 int element_equals(const struct Element e1, const struct Element e2);
 
 void element_print(const struct Element el);
@@ -65,9 +71,9 @@ int element_array_equals(const struct ElementArray *e1, const struct ElementArra
 void element_array_print(const struct ElementArray ea);
 
 /*
-return one character and move cursor.
-return EOF if end of file.
-*/
+   return one character and move cursor.
+   return EOF if end of file.
+   */
 int cl_getc();
 void cl_getc_set_src(char* str);
 
@@ -75,8 +81,8 @@ int parse_one(int prev_ch, struct Token *out_token);
 
 
 /*
-    return NULL if stack empty
-*/
+   return NULL if stack empty
+   */
 struct Element *try_stack_pop();
 
 void stack_push(const struct Element *el);
@@ -86,9 +92,9 @@ void stack_clear();
 void stack_print_all();
 
 /*
-return 1 if key exists
-return 0 if key not exists
-*/
+   return 1 if key exists
+   return 0 if key not exists
+   */
 int dict_get(char* key, struct Element *out_el);
 
 void dict_put(char* key, struct Element *el);

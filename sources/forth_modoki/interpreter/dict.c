@@ -66,20 +66,8 @@ void dict_print_all() {
     while(i--) {
         struct Node *head = array[i];
         while(head) {
-            switch(head->value.etype) {
-                case ELEMENT_NUMBER:
-                    printf("KEY: %s NUMBER: %d\n", head->key, head->value.u.number);
-                    break;
-                case ELEMENT_LITERAL_NAME:
-                    printf("KEY: %s LITERAL_NAME: %s\n", head->key, head->value.u.name);
-                    break;
-                case ELEMENT_C_FUNC:
-                    printf("KEY: %s C_FUNC: %p\n", head->key, head->value.u.cfunc);
-                    break;
-                default:
-                    printf("KEY: %s UNKNOWN TYPE %d\n", head->key, head->value.etype);
-                    break;
-            }
+            printf("KEY: %s", head->key);
+            element_print(head->value);
             head = head->next;
         }
     }

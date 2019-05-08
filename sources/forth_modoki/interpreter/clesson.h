@@ -53,7 +53,7 @@ struct Element element_number(int i);
 struct Element element_executable_name(char *s);
 struct Element element_literal_name(char *s);
 struct Element element_exec_array(struct ElementArray *ea);
-
+struct Element element_c_func(void (*f)());
 
 int element_equals(const struct Element e1, const struct Element e2);
 
@@ -85,7 +85,7 @@ int parse_one(int prev_ch, struct Token *out_token);
    */
 struct Element *try_stack_pop();
 
-void stack_push(const struct Element *el);
+void stack_push(const struct Element el);
 
 void stack_clear();
 
@@ -97,7 +97,7 @@ void stack_print_all();
    */
 int dict_get(char* key, struct Element *out_el);
 
-void dict_put(char* key, struct Element *el);
+void dict_put(char* key, struct Element el);
 
 void dict_clear();
 

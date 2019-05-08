@@ -17,11 +17,11 @@ struct Element *try_stack_pop() {
     return NULL;
 }
 
-void stack_push(const struct Element *el) {
+void stack_push(const struct Element el) {
     assert(sp < STACK_SIZE);
 
     if(sp < STACK_SIZE) {
-        stack[sp++] = *el;
+        stack[sp++] = el;
     }
 }
 
@@ -48,7 +48,7 @@ static void test_try_stack_pop() {
 static void test_stack_push() {
     struct Element input = {0};
 
-    stack_push(&input);
+    stack_push(input);
 
     assert(sp == 1);
     assert(element_equals(stack[0], input));
@@ -59,7 +59,7 @@ static void test_stack_push_pop() {
 
     struct Element actual;
 
-    stack_push(&input);
+    stack_push(input);
     actual = *try_stack_pop();
 
     assert(sp == 0);
@@ -72,8 +72,8 @@ static void test_stack_push_push_pop_pop() {
 
     struct Element actual;
 
-    stack_push(&input_1);
-    stack_push(&input_2);
+    stack_push(input_1);
+    stack_push(input_2);
 
     actual = *try_stack_pop();
     assert(element_equals(actual, input_2));
@@ -98,10 +98,10 @@ static void test_all() {
     test_stack_push_push_pop_pop();
 
 
-    stack_push(&(struct Element){ELEMENT_NUMBER, .u.number = 123});
-    stack_push(&(struct Element){ELEMENT_NUMBER, .u.number = 45});
-    stack_push(&(struct Element){ELEMENT_LITERAL_NAME, .u.name = "some"});
-    stack_push(&(struct Element){ELEMENT_LITERAL_NAME, .u.name = "some2"});
+    stack_push(element_number(123));
+    stack_push(element_number(45));
+    stack_push(element_literal_name("some"));
+    stack_push(element_literal_name("some2"));
 
     stack_print_all();
 }
@@ -110,6 +110,6 @@ static void test_all() {
 int main() {
     test_all();
 
-    return 1;
+    return 0;
 }
 #endif

@@ -100,12 +100,16 @@ struct Element element_literal_name(char *s) {
     return (struct Element){ELEMENT_LITERAL_NAME, .u.name = s};
 }
 
-struct Element element_execution_name(char *s) {
+struct Element element_executable_name(char *s) {
     return (struct Element){ELEMENT_EXECUTABLE_NAME, .u.name = s};
 }
 
 struct Element element_exec_array(struct ElementArray *ea) {
     return (struct Element){ELEMENT_EXEC_ARRAY, .u.exec_array = ea};
+}
+
+struct Element element_c_func(void (*f)()) {
+    return (struct Element){ELEMENT_C_FUNC, .u.cfunc = f};
 }
 
 
@@ -134,7 +138,7 @@ static void test_element_equals_name() {
 
     struct Element input = element_literal_name("abc");
     struct Element expect_true = element_literal_name("abc");
-    struct Element expect_false = element_execution_name("abc");
+    struct Element expect_false = element_executable_name("abc");
 
     assert_element_equals(expect_true, expect_false, input);
 }
@@ -181,7 +185,7 @@ static void test_element_array_equals_length() {
 static void test_element_array_equals_element() {
     struct Element input[] = {element_literal_name("abc")};
     struct Element expect_true[] = {element_literal_name("abc")};
-    struct Element expect_false[] = {element_execution_name("abc")};
+    struct Element expect_false[] = {element_executable_name("abc")};
 
     assert_element_array_equals(EA(expect_true), EA(expect_false), EA(input));
 }

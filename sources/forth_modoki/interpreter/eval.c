@@ -2,7 +2,6 @@
 #include "clesson.h"
 
 
-#define assert_fail(msg) assert(0&&(msg))
 
 static struct Element *stack_pop() {
     struct Element *el = try_stack_pop();
@@ -80,6 +79,41 @@ static void register_primitive() {
     dict_put("div", &(struct Element){ELEMENT_C_FUNC, .u.cfunc = &div_op});
 }
 
+static int compile_exec_array(int ch, struct ElementArray **out_element_array) {
+    struct Element elements[100];
+    struct Token token = {LEX_UNKNOWN, {0}};
+
+    int i = 0;
+    do {
+        ch = parse_one(ch, &token);
+        switch(token.ltype) {
+            case LEX_NUMBER:
+            case LEX_EXECUTABLE_NAME:
+            case LEX_LITERAL_NAME:
+                elements[i++] = *(struct Element*)&token;
+                break;
+            case LEX_CLOSE_CURLY:
+            case LEX_SPACE:
+                break;
+            case LEX_OPEN_CURLY:
+                {
+                    struct ElementArray *ea = NULL;
+                    ch = compile_exec_array(ch, &ea);
+                    elements[i++] = (struct Element){ELEMENT_EXEC_ARRAY, .u.exec_array = ea};
+                }
+                break;
+            case LEX_END_OF_FILE:
+            default:
+                assert_fail("NOT IMPLEMENTED");
+                break;
+
+        }
+    } while(token.ltype != LEX_CLOSE_CURLY);
+
+    *out_element_array = new_element_array(i, elements);
+    return ch;
+}
+
 void eval() {
     int ch = EOF;
     struct Token token = {
@@ -112,6 +146,16 @@ void eval() {
                                 break;
                         }
                     }
+                    break;
+                case LEX_OPEN_CURLY:
+                    {
+                        struct ElementArray *ea = NULL;
+                        ch = compile_exec_array(ch, &ea);
+                        stack_push(&(struct Element){ELEMENT_EXEC_ARRAY, .u.exec_array = ea});
+                    }
+                    break;
+                case LEX_CLOSE_CURLY:
+                    assert_fail("SYNTAX ERROR");
                     break;
                 case LEX_SPACE:
                 case LEX_END_OF_FILE:
@@ -273,7 +317,19 @@ static void call_eval(char *input) {
     eval();
 }
 
-#define TO_EA(a) new_element_array(sizeof(a), a)
+#define EA(a) new_element_array(sizeof(a) / sizeof(struct Element), a)
+
+static void assert_element_array_equals(struct ElementArray *expect, struct ElementArray *actual) {
+    assert(element_array_equals(expect, actual));
+}
+
+static void test_eval_executable_array_empty() {
+    char *input = "{}";
+    struct Element expect[] = {};
+
+    call_eval(input);
+    assert_element_array_equals(EA(expect), stack_pop_exec_array());
+}
 
 static void test_eval_executable_array_num() {
     char *input = "{1}";
@@ -282,7 +338,7 @@ static void test_eval_executable_array_num() {
     };
 
     call_eval(input);
-    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+    assert_element_array_equals(EA(expect), stack_pop_exec_array());
 }
 
 static void test_eval_executable_array_literal_name() {
@@ -292,7 +348,7 @@ static void test_eval_executable_array_literal_name() {
     };
 
     call_eval(input);
-    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+    assert_element_array_equals(EA(expect), stack_pop_exec_array());
 }
 
 static void test_eval_executable_array_executable_name() {
@@ -302,7 +358,7 @@ static void test_eval_executable_array_executable_name() {
     };
 
     call_eval(input);
-    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+    assert_element_array_equals(EA(expect), stack_pop_exec_array());
 }
 
 static void test_eval_executable_array_multiple_elements() {
@@ -313,21 +369,21 @@ static void test_eval_executable_array_multiple_elements() {
     };
 
     call_eval(input);
-    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+    assert_element_array_equals(EA(expect), stack_pop_exec_array());
 }
 
 static void test_eval_executable_array_multiple_arrays() {
     char *input = "{1} {2}";
     struct Element expect1[] = {
-        (struct Element){ELEMENT_NUMBER, .u.number = 1}
+        (struct Element){ELEMENT_NUMBER, .u.number = 2}
     };
     struct Element expect2[] = {
-        (struct Element){ELEMENT_NUMBER, .u.number = 2}
+        (struct Element){ELEMENT_NUMBER, .u.number = 1}
     };
 
     call_eval(input);
-    assert(element_array_equals(TO_EA(expect1), stack_pop_exec_array()));
-    assert(element_array_equals(TO_EA(expect2), stack_pop_exec_array()));
+    assert_element_array_equals(EA(expect1), stack_pop_exec_array());
+    assert_element_array_equals(EA(expect2), stack_pop_exec_array());
 }
 
 static void test_eval_executable_array_nested() {
@@ -335,14 +391,14 @@ static void test_eval_executable_array_nested() {
     struct Element expect[] = {
         (struct Element){ELEMENT_NUMBER, .u.number = 1},
         (struct Element){ELEMENT_EXEC_ARRAY, .u.exec_array
-            = TO_EA(((struct Element [1]){
+            = EA(((struct Element [1]){
                         (struct Element){ELEMENT_NUMBER, .u.number = 2}
                         }))},
         (struct Element){ELEMENT_NUMBER, .u.number = 3}
     };
 
     call_eval(input);
-    assert(element_array_equals(TO_EA(expect), stack_pop_exec_array()));
+    assert_element_array_equals(EA(expect), stack_pop_exec_array());
 }
 
 #undef EA
@@ -364,6 +420,7 @@ __attribute__((unused))
         test_eval_div();
         test_eval_div_truncation();
 
+        test_eval_executable_array_empty();
         test_eval_executable_array_num();
         test_eval_executable_array_literal_name();
         test_eval_executable_array_executable_name();

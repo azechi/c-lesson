@@ -19,18 +19,18 @@ static int hash(char *str) {
     return (int)(val % TABLE_SIZE);
 }
 
-static struct Node *new_node(char* key, struct Element *value) {
+static struct Node *new_node(char* key, struct Element value) {
     struct Node *n = malloc(sizeof(struct Node));
     n->key = key;
-    n->value = *value;
+    n->value = value;
     n->next = NULL;
     return n;
 }
 
-static void update_or_insert_list(struct Node **head, char *key, struct Element *value) {
+static void update_or_insert_list(struct Node **head, char *key, struct Element value) {
     while(*head) {
         if(streq(key, (*head)->key)){
-            (*head)->value = *value;
+            (*head)->value = value;
             return;
         }
 
@@ -41,7 +41,7 @@ static void update_or_insert_list(struct Node **head, char *key, struct Element 
 }
 
 
-void dict_put(char* key, struct Element *el) {
+void dict_put(char* key, struct Element el) {
     int h = hash(key);
     update_or_insert_list(&array[h], key, el);
 }
@@ -104,7 +104,7 @@ static void test_dict_key_exists() {
     struct Element dummy = {0};
 
     dict_clear();
-    dict_put("key", &dummy);
+    dict_put("key", dummy);
     int actual = dict_get("key", &dummy);
 
     assert(expect == actual);
@@ -115,7 +115,7 @@ static void test_dict_put_get() {
     struct Element expect = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
 
     dict_clear();
-    dict_put("key", &input);
+    dict_put("key", input);
     struct Element actual = {0};
     dict_get("key", &actual);
 
@@ -129,8 +129,8 @@ static void test_dict_append_key() {
     struct Element expect_2 = {ELEMENT_NUMBER, .u.number = 1};
 
     dict_clear();
-    dict_put("p", &input_1);
-    dict_put("o", &input_2);
+    dict_put("p", input_1);
+    dict_put("o", input_2);
 
     struct Element actual_1 = {0};
     struct Element actual_2 = {0};
@@ -151,8 +151,8 @@ static void test_dict_append_key_hash_collision() {
     struct Element expect_2 = {ELEMENT_NUMBER, .u.number = 9};
 
     dict_clear();
-    dict_put("key", &input_1);
-    dict_put("kye", &input_2); /* this key causes a hash collision that depends on hash algorithm */
+    dict_put("key", input_1);
+    dict_put("kye", input_2); /* this key causes a hash collision that depends on hash algorithm */
 
     struct Element actual_1 = {0};
     struct Element actual_2 = {0};
@@ -171,8 +171,8 @@ static void test_dict_overwrite() {
     struct Element expect = {ELEMENT_LITERAL_NAME, .u.name= "abc"};
 
     dict_clear();
-    dict_put("key", &input_1);
-    dict_put("key", &input_2);
+    dict_put("key", input_1);
+    dict_put("key", input_2);
 
     struct Element actual = {0};
     dict_get("key", &actual);

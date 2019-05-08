@@ -2,7 +2,6 @@
 #include "clesson.h"
 
 
-
 static struct Element *stack_pop() {
     struct Element *el = try_stack_pop();
     if(!el){
@@ -79,8 +78,10 @@ static void register_primitive() {
     dict_put("div", &(struct Element){ELEMENT_C_FUNC, .u.cfunc = &div_op});
 }
 
+#define MAX_OP_NUMBERS 256
+
 static int compile_exec_array(int ch, struct ElementArray **out_element_array) {
-    struct Element elements[100];
+    struct Element elements[MAX_OP_NUMBERS];
     struct Token token = {LEX_UNKNOWN, {0}};
 
     int i = 0;

@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
+
+#define assert_fail(msg) assert(0&&(msg))
+
+
 int streq(char *s1, char *s2);
 
 enum LexicalType {
@@ -47,6 +51,8 @@ struct Element {
 
 int element_equals(const struct Element e1, const struct Element e2);
 
+void element_print(const struct Element el);
+
 struct ElementArray {
     int len;
     struct Element elements[0];
@@ -55,6 +61,8 @@ struct ElementArray {
 struct ElementArray *new_element_array(int length, struct Element *elements);
 
 int element_array_equals(const struct ElementArray *e1, const struct ElementArray *e2);
+
+void element_array_print(const struct ElementArray ea);
 
 /*
 return one character and move cursor.

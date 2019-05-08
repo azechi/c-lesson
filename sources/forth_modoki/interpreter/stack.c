@@ -29,21 +29,11 @@ void stack_clear() {
     sp = 0;
 }
 
-void stack_print_all() {
-    struct Element *el;
-    while((el = try_stack_pop())) {
-        switch(el->etype) {
-            case ELEMENT_NUMBER:
-                printf("num: %d\n", el->u.number);
-                break;
-            case ELEMENT_LITERAL_NAME:
-                printf("ELEMENT_LITERAL_NAME: %s\n", el->u.name);
-                break;
-            default:
-                printf("Unknown type %d\n", el->etype);
-                break;
-        }
-    }
+void stack_print_all() { 
+    int i = sp;
+    while(i > 0) {
+        element_print(stack[--i]);
+    };
 }
 
 

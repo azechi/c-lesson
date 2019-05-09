@@ -68,7 +68,7 @@ struct ElementArray *new_element_array(int length, struct Element *elements);
 
 int element_array_equals(const struct ElementArray *e1, const struct ElementArray *e2);
 
-void element_array_print(const struct ElementArray ea);
+void element_array_print(const struct ElementArray *ea);
 
 /*
    return one character and move cursor.

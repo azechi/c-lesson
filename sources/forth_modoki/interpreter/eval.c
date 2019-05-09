@@ -80,6 +80,7 @@ static void register_primitive() {
 
 #define MAX_OP_NUMBERS 256
 static void eval_executable_name(char *name);
+static void eval_exec_array(struct ElementArray *ea);
 
 
 static void eval_exec_array(struct ElementArray *ea) {
@@ -212,15 +213,18 @@ static void env_init(char *input) {
 }
 
 
+/* unit tests */
+
+static void call_eval(char *input) {
+    env_init(input);
+    eval();
+}
+
 static void assert_dict_contains(char *expect_key, struct Element expect_el) {
     struct Element actual = {0};
 
     assert(dict_get(expect_key, &actual));
     assert(element_equals(expect_el, actual));
-}
-
-static void assert_element_array_equals(struct ElementArray *expect, struct ElementArray *actual) {
-    assert(element_array_equals(expect, actual));
 }
 
 static void assert_stack(int expect_length, struct Element expect_elements[]){
@@ -231,25 +235,24 @@ static void assert_stack(int expect_length, struct Element expect_elements[]){
     assert(try_stack_pop() == NULL);
 }
 
+#define ELEMENT_ARRAY(a) new_element_array(sizeof(a) / sizeof(struct Element), a)
 
-static void test_pop_number_value() {
-    struct Element input = {ELEMENT_NUMBER, {1}};
-    int expect = 1;
+#define ASSERT_ELEMENT_ARRAY_EQUALS(a, b) assert(element_array_equals(ELEMENT_ARRAY(a), b))
+#define ASSSERT_STACK(a) assert_stack(sizeof(a) / sizeof(struct Element), a)
 
-    env_init("");
 
+static void test_stack_pop() {
+    struct Element input = element_number(1);
+    struct Element expect = element_number(1);
+
+    stack_clear();
     stack_push(input);
 
-    assert(expect == stack_pop_number_value());
+    assert(element_equals(expect, stack_pop()));
 }
 
 static void test_eval_empty() {
-    char *input = "";
-
-    env_init(input);
-
-    eval();
-
+    env_init("");
     assert(NULL == try_stack_pop());
 }
 
@@ -257,10 +260,7 @@ static void test_eval_num_one() {
     char *input = "123";
     int expect = 123;
 
-    env_init(input);
-
-    eval();
-
+    call_eval(input);
     assert(expect == stack_pop_number_value());
 }
 
@@ -269,10 +269,7 @@ static void test_eval_num_two() {
     int expect1 = 456;
     int expect2 = 123;
 
-    env_init(input);
-
-    eval();
-
+    call_eval(input);
     assert(expect1 == stack_pop_number_value());
     assert(expect2 == stack_pop_number_value());
 }
@@ -281,10 +278,7 @@ static void test_eval_num_add() {
     char *input = "1 2 add";
     int expect = 3;
 
-    env_init(input);
-
-    eval();
-
+    call_eval(input);
     assert(expect == stack_pop_number_value());
 }
 
@@ -292,9 +286,7 @@ static void test_eval_literal_name() {
     char *input = "/abc";
     struct Element expect = element_literal_name("abc");
 
-    env_init(input);
-
-    eval();
+    call_eval(input);
     assert(element_equals(expect, stack_pop()));
 }
 
@@ -304,10 +296,7 @@ static void test_eval_def_dict_put() {
     char *expect_key = "abc";
     struct Element expect_el = element_number(123);
 
-    env_init(input);
-
-    eval();
-
+    call_eval(input);
     assert_dict_contains(expect_key, expect_el);
 }
 
@@ -315,9 +304,7 @@ static void test_eval_def_dict_get() {
     char *input = "/abc 123 def abc";
     int expect = 123;
 
-    env_init(input);
-
-    eval();
+    call_eval(input);
     assert(expect == stack_pop_number_value());
 }
 
@@ -325,9 +312,7 @@ static void test_eval_sub() {
     char *input = "5 3 sub";
     int expect = 2;
 
-    env_init(input);
-
-    eval();
+    call_eval(input);
     assert(expect == stack_pop_number_value());
 }
 
@@ -335,9 +320,7 @@ static void test_eval_mul() {
     char *input = "2 4 mul";
     int expect = 8;
 
-    env_init(input);
-
-    eval();
+    call_eval(input);
     assert(expect == stack_pop_number_value());
 }
 
@@ -345,9 +328,7 @@ static void test_eval_div() {
     char *input = "6 2 div";
     int expect = 3;
 
-    env_init(input);
-
-    eval();
+    call_eval(input);
     assert(expect == stack_pop_number_value());
 }
 
@@ -355,49 +336,47 @@ static void test_eval_div_truncation() {
     char *input = "14 4 div";
     int expect = 3;
 
-    env_init(input);
-
-    eval();
+    call_eval(input);
     assert(expect == stack_pop_number_value());
 }
 
-static void call_eval(char *input) {
-    env_init(input);
-    eval();
-}
-
-#define EA(a) new_element_array(sizeof(a) / sizeof(struct Element), a)
 
 static void test_compile_executable_array_empty() {
     char *input = "{}";
     struct Element expect[] = {};
 
     call_eval(input);
-    assert_element_array_equals(EA(expect), stack_pop_exec_array());
+    ASSERT_ELEMENT_ARRAY_EQUALS(expect, stack_pop_exec_array());
 }
 
 static void test_compile_executable_array_num() {
     char *input = "{1}";
-    struct Element expect[] = {element_number(1)};
+    struct Element expect[] = {
+        element_number(1)
+    };
 
     call_eval(input);
-    assert_element_array_equals(EA(expect), stack_pop_exec_array());
+    ASSERT_ELEMENT_ARRAY_EQUALS(expect, stack_pop_exec_array());
 }
 
 static void test_compile_executable_array_literal_name() {
     char *input = "{/abc}";
-    struct Element expect[] = {element_literal_name("abc")};
+    struct Element expect[] = {
+        element_literal_name("abc")
+    };
 
     call_eval(input);
-    assert_element_array_equals(EA(expect), stack_pop_exec_array());
+    ASSERT_ELEMENT_ARRAY_EQUALS(expect, stack_pop_exec_array());
 }
 
 static void test_compile_executable_array_executable_name() {
     char *input = "{abc}";
-    struct Element expect[] = {element_executable_name("abc")};
+    struct Element expect[] = {
+        element_executable_name("abc")
+    };
 
     call_eval(input);
-    assert_element_array_equals(EA(expect), stack_pop_exec_array());
+    ASSERT_ELEMENT_ARRAY_EQUALS(expect, stack_pop_exec_array());
 }
 
 static void test_compile_executable_array_multiple_elements() {
@@ -408,26 +387,36 @@ static void test_compile_executable_array_multiple_elements() {
     };
 
     call_eval(input);
-    assert_element_array_equals(EA(expect), stack_pop_exec_array());
+    ASSERT_ELEMENT_ARRAY_EQUALS(expect, stack_pop_exec_array());
 }
 
 static void test_compile_executable_array_multiple_arrays() {
     char *input = "{1} {2}";
-    struct Element expect1[] = {element_number(2)};
-    struct Element expect2[] = {element_number(1)};
+    struct Element expect1[] = {
+        element_number(2)
+    };
+    struct Element expect2[] = {
+        element_number(1)
+    };
 
     call_eval(input);
-    assert_element_array_equals(EA(expect1), stack_pop_exec_array());
-    assert_element_array_equals(EA(expect2), stack_pop_exec_array());
+    ASSERT_ELEMENT_ARRAY_EQUALS(expect1, stack_pop_exec_array());
+    ASSERT_ELEMENT_ARRAY_EQUALS(expect2, stack_pop_exec_array());
 }
 
 static void test_compile_executable_array_nested() {
     char *input = "{1 {2} 3}";
-    struct Element expect_children[] = {element_number(2)};
-    struct Element expect[] = {element_number(1), element_exec_array(EA(expect_children)), element_number(3)};
+    struct Element expect_contents[] = {
+        element_number(2)
+    };
+    struct Element expect[] = {
+        element_number(1), 
+        element_exec_array(ELEMENT_ARRAY(expect_contents)), 
+        element_number(3)
+    };
 
     call_eval(input);
-    assert_element_array_equals(EA(expect), stack_pop_exec_array());
+    ASSERT_ELEMENT_ARRAY_EQUALS(expect, stack_pop_exec_array());
 }
 
 static void test_eval_executable_array() {
@@ -441,14 +430,16 @@ static void test_eval_executable_array() {
 static void test_eval_executable_array_nested() {
     char *input = "/ZZ {6} def /YY {4 ZZ} def";
     char *expect_key = "YY";
-    struct Element expect_el_children[] = {element_number(4), element_executable_name("ZZ")};
-    struct Element expect_el = element_exec_array(EA(expect_el_children));
+    struct Element expect_el_contents[] = {
+        element_number(4),
+        element_executable_name("ZZ")
+    };
+    struct Element expect_el = element_exec_array(ELEMENT_ARRAY(expect_el_contents));
+
     call_eval(input);
     assert_dict_contains(expect_key, expect_el);
 }
 
-
-#define ASSSERT_STACK(a) assert_stack(sizeof(a) / sizeof(struct Element), a)
 
 static void test_eval_executable_array_nested_nested() {
     char *input = "/ZZ {6} def" \
@@ -468,12 +459,11 @@ static void test_eval_executable_array_nested_nested() {
     ASSSERT_STACK(expect);
 }
 
-#undef EA
-#undef ASSSERT_STACK
 
 __attribute__((unused))
     static void test_all() {
-        test_pop_number_value();
+        test_stack_pop();
+
         test_eval_empty();
         test_eval_num_one();
         test_eval_num_two();

@@ -131,7 +131,7 @@ static void eval_executable_name(char *name) {
     }
 }
 
-static int compile_exec_array(int ch, struct Element *out_element) {
+static struct Element compile_exec_array(int ch, int *out_ch) {
     struct Element elements[MAX_OP_NUMBERS];
     struct Token token = {LEX_UNKNOWN, {0}};
 
@@ -148,11 +148,7 @@ static int compile_exec_array(int ch, struct Element *out_element) {
             case LEX_SPACE:
                 break;
             case LEX_OPEN_CURLY:
-                {
-                    struct Element el = {0};
-                    ch = compile_exec_array(ch, &el);
-                    elements[i++] = el;
-                }
+                elements[i++] = compile_exec_array(ch, &ch);
                 break;
             case LEX_END_OF_FILE:
             default:
@@ -162,8 +158,8 @@ static int compile_exec_array(int ch, struct Element *out_element) {
         }
     } while(token.ltype != LEX_CLOSE_CURLY);
 
-    *out_element = element_exec_array(new_element_array(i, elements));
-    return ch;
+    *out_ch = ch;
+    return element_exec_array(new_element_array(i, elements));
 }
 
 void eval() {
@@ -185,11 +181,7 @@ void eval() {
                     eval_executable_name(token.u.name);
                     break;
                 case LEX_OPEN_CURLY:
-                    {
-                        struct Element el = {0};
-                        ch = compile_exec_array(ch, &el);
-                        stack_push(el);
-                    }
+                    stack_push(compile_exec_array(ch, &ch));
                     break;
                 case LEX_CLOSE_CURLY:
                     assert_fail("SYNTAX ERROR");

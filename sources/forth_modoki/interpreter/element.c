@@ -87,9 +87,9 @@ void element_print(const struct Element el) {
 }
 
 
-void element_array_print(const struct ElementArray ea) {
-    printf("len %d\n", ea.len);
-    element_array_print_with_indent(0, &ea);
+void element_array_print(const struct ElementArray *ea) {
+    printf("len %d\n", ea->len);
+    element_array_print_with_indent(0, ea);
 }
 
 struct Element element_number(int i) {

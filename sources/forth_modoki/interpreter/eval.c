@@ -131,7 +131,7 @@ static void eval_executable_name(char *name) {
     }
 }
 
-static int compile_exec_array(int ch, struct ElementArray **out_element_array) {
+static int compile_exec_array(int ch, struct Element *out_element) {
     struct Element elements[MAX_OP_NUMBERS];
     struct Token token = {LEX_UNKNOWN, {0}};
 
@@ -149,9 +149,9 @@ static int compile_exec_array(int ch, struct ElementArray **out_element_array) {
                 break;
             case LEX_OPEN_CURLY:
                 {
-                    struct ElementArray *ea = NULL;
-                    ch = compile_exec_array(ch, &ea);
-                    elements[i++] = element_exec_array(ea);
+                    struct Element el = {0};
+                    ch = compile_exec_array(ch, &el);
+                    elements[i++] = el;
                 }
                 break;
             case LEX_END_OF_FILE:
@@ -162,7 +162,7 @@ static int compile_exec_array(int ch, struct ElementArray **out_element_array) {
         }
     } while(token.ltype != LEX_CLOSE_CURLY);
 
-    *out_element_array = new_element_array(i, elements);
+    *out_element = element_exec_array(new_element_array(i, elements));
     return ch;
 }
 
@@ -186,9 +186,9 @@ void eval() {
                     break;
                 case LEX_OPEN_CURLY:
                     {
-                        struct ElementArray *ea = NULL;
-                        ch = compile_exec_array(ch, &ea);
-                        stack_push(element_exec_array(ea));
+                        struct Element el = {0};
+                        ch = compile_exec_array(ch, &el);
+                        stack_push(el);
                     }
                     break;
                 case LEX_CLOSE_CURLY:

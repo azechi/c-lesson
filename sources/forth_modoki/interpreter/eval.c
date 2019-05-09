@@ -79,6 +79,56 @@ static void register_primitive() {
 }
 
 #define MAX_OP_NUMBERS 256
+static void eval_executable_name(char *name);
+
+
+static void eval_exec_array(struct ElementArray *ea) {
+    int i;
+    int len = ea->len;
+
+    for(i = 0; i < len; i++) {
+        struct Element el = ea->elements[i];
+
+        switch(el.etype) {
+            case ELEMENT_NUMBER:
+            case ELEMENT_LITERAL_NAME:
+                stack_push(el);
+                break;
+            case ELEMENT_C_FUNC:
+                el.u.cfunc();
+                break;
+            case ELEMENT_EXEC_ARRAY:
+                eval_exec_array(el.u.exec_array);
+                break;
+            case ELEMENT_EXECUTABLE_NAME:
+                eval_executable_name(el.u.name);
+                break;
+            default:
+                assert_fail("NOT IMPLEMENTED");
+                break;
+        }
+    }
+}
+
+static void eval_executable_name(char *name) {
+    struct Element el = {0};
+    if(!dict_get(name, &el)) {
+        assert_fail("EXECUTABLE NAME NOT FOUND");
+        return;
+    }
+
+    switch(el.etype) {
+        case ELEMENT_C_FUNC:
+            el.u.cfunc();
+            break;
+        case ELEMENT_EXEC_ARRAY:
+            eval_exec_array(el.u.exec_array);
+            break;
+        default:
+            stack_push(el);
+            break;
+    }
+}
 
 static int compile_exec_array(int ch, struct ElementArray **out_element_array) {
     struct Element elements[MAX_OP_NUMBERS];
@@ -131,22 +181,7 @@ void eval() {
                     stack_push(*(struct Element*)&token);
                     break;
                 case LEX_EXECUTABLE_NAME:
-                    {
-                        struct Element el = {0};
-                        if(!dict_get(token.u.name, &el)) {
-                            assert_fail("EXECUTABLE NAME NOT FOUND");
-                            break;
-                        }
-
-                        switch(el.etype) {
-                            case ELEMENT_C_FUNC:
-                                el.u.cfunc();
-                                break;
-                            default:
-                                stack_push(el);
-                                break;
-                        }
-                    }
+                    eval_executable_name(token.u.name);
                     break;
                 case LEX_OPEN_CURLY:
                     {

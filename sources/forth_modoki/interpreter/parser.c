@@ -20,6 +20,19 @@ static char* malloc_copy_str(int size, char* src) {
     return dest;
 }
 
+static int is_digit(char ch) {
+    return '0' <= ch && ch <= '9';
+}
+
+static int is_alpha(char ch) {
+    return ('a' <= ch && ch <= 'z') 
+        || ('A' <= ch && ch <= 'Z');
+}
+
+static int is_alpha_digit(char ch) {
+    return is_digit(ch) || is_alpha(ch);
+}
+
 
 int parse_one(int prev_ch, struct Token *out_token) {
     int ch;
@@ -32,10 +45,10 @@ int parse_one(int prev_ch, struct Token *out_token) {
 
     if (prev_ch == EOF) {
         out_token->ltype = LEX_END_OF_FILE;
-    } else if ('0' <= prev_ch && prev_ch <= '9') {
+    } else if (is_digit(prev_ch)) {
         int acm = prev_ch - '0';
 
-        while ('0' <= ch && ch <= '9') {
+        while (is_digit(ch)) {
             acm = acm * 10 + ch - '0';
             ch = cl_getc();
         }
@@ -50,14 +63,13 @@ int parse_one(int prev_ch, struct Token *out_token) {
 
         out_token->ltype = LEX_SPACE;
         out_token->u.onechar  = ' ';
-    } else if ('a' <= prev_ch && prev_ch <= 'z') {
+    } else if (is_alpha(prev_ch)) {
         char buf[NAME_SIZE];
         int i = 0;
 
         buf[i++] = prev_ch;
 
-        while (('a' <= ch && ch <= 'z')
-                || ('0' <= ch && ch <= '9')) {
+        while (is_alpha_digit(ch)) {
             buf[i++] = ch;
             ch = cl_getc();
         }
@@ -66,15 +78,14 @@ int parse_one(int prev_ch, struct Token *out_token) {
         char* name = malloc_copy_str(i + 1, buf);
         out_token->ltype = LEX_EXECUTABLE_NAME;
         out_token->u.name = name;
-    } else if (prev_ch == '/' && 'a' <= ch && ch <= 'z') {
+    } else if (prev_ch == '/' && is_alpha(ch)) {
         char buf[NAME_SIZE];
         int i = 0;
 
         buf[i++] = ch;
         ch = cl_getc();
 
-        while (('a' <= ch && ch <= 'z')
-                || ('0' <= ch && ch <= '9')) {
+        while (is_alpha_digit(ch)) {
             buf[i++] = ch;
             ch = cl_getc();
         }

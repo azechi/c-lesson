@@ -79,7 +79,7 @@ int parse_one(int prev_ch, struct Token *out_token);
    */
 struct Element *try_stack_pop();
 
-void stack_push(const struct Element el);
+void stack_push(const struct Element *el);
 
 void stack_clear();
 

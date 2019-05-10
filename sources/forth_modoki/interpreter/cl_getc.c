@@ -11,7 +11,7 @@ int cl_getc() {
     return input[pos++];
 }
 
-void cl_getc_set_src(char* str){
+void cl_getc_set_src(const char* str){
     input = str;
     pos = 0;
 }

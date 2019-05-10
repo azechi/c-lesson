@@ -69,7 +69,7 @@ void element_array_print(const struct ElementArray *ea);
    return EOF if end of file.
    */
 int cl_getc();
-void cl_getc_set_src(char* str);
+void cl_getc_set_src(const char* str);
 
 int parse_one(int prev_ch, struct Token *out_token);
 

@@ -49,22 +49,16 @@ struct Element {
     } u;
 };
 
-struct Element element_number(int i);
-struct Element element_executable_name(char *s);
-struct Element element_literal_name(char *s);
-struct Element element_exec_array(struct ElementArray *ea);
-struct Element element_c_func(void (*f)());
+int element_equals(const struct Element *e1, const struct Element *e2);
 
-int element_equals(const struct Element e1, const struct Element e2);
-
-void element_print(const struct Element el);
+void element_print(const struct Element *el);
 
 struct ElementArray {
     int len;
     struct Element elements[0];
 };
 
-struct ElementArray *new_element_array(int length, struct Element *elements);
+struct ElementArray *new_element_array(int length, const struct Element *elements);
 
 int element_array_equals(const struct ElementArray *e1, const struct ElementArray *e2);
 

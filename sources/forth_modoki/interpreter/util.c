@@ -1,6 +1,6 @@
 #include "clesson.h"
 
-int streq(char *s1, char *s2) {
+int streq(const char *s1, const char *s2) {
     return (strcmp(s1, s2) == 0);
 }
 

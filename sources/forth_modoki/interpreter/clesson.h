@@ -5,7 +5,7 @@
 #define assert_fail(msg) assert(0&&(msg))
 
 
-int streq(char *s1, char *s2);
+int streq(const char *s1, const char *s2);
 
 enum LexicalType {
     LEX_NUMBER,
@@ -89,9 +89,9 @@ void stack_print_all();
    return 1 if key exists
    return 0 if key not exists
    */
-int dict_get(char* key, struct Element *out_el);
+int dict_get(const char* key, struct Element *out_el);
 
-void dict_put(char* key, struct Element el);
+void dict_put(const char* key, const struct Element *el);
 
 void dict_clear();
 

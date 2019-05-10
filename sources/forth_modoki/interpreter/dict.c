@@ -5,13 +5,13 @@
 #define TABLE_SIZE 16
 
 struct Node {
-    char *key;
+    const char *key;
     struct Element value;
     struct Node *next;
 };
 static struct Node *array[TABLE_SIZE];
 
-static int hash(char *str) {
+static int hash(const char *str) {
     unsigned int val = 0;
     while(*str) {
         val += *str++;
@@ -19,18 +19,18 @@ static int hash(char *str) {
     return (int)(val % TABLE_SIZE);
 }
 
-static struct Node *new_node(char* key, struct Element value) {
+static struct Node *new_node(const char* key, const struct Element *value) {
     struct Node *n = malloc(sizeof(struct Node));
     n->key = key;
-    n->value = value;
+    n->value = *value;
     n->next = NULL;
     return n;
 }
 
-static void update_or_insert_list(struct Node **head, char *key, struct Element value) {
+static void update_or_insert_list(struct Node **head, const char *key, const struct Element *value) {
     while(*head) {
         if(streq(key, (*head)->key)){
-            (*head)->value = value;
+            (*head)->value = *value;
             return;
         }
 
@@ -41,12 +41,13 @@ static void update_or_insert_list(struct Node **head, char *key, struct Element 
 }
 
 
-void dict_put(char* key, struct Element el) {
+void dict_put(const char* key, const struct Element *el) {
     int h = hash(key);
     update_or_insert_list(&array[h], key, el);
 }
 
-int dict_get(char* key, struct Element *out_el) {
+
+int dict_get(const char* key, struct Element *out_el) {
     int h = hash(key);
     struct Node *head = array[h];
 
@@ -67,7 +68,7 @@ void dict_print_all() {
         struct Node *head = array[i];
         while(head) {
             printf("KEY: %s", head->key);
-            element_print(head->value);
+            element_print(&head->value);
             head = head->next;
         }
     }
@@ -89,6 +90,15 @@ void dict_clear() {
 
 /* unit tests */
 
+static void assert_dict_contains(const char *key, const struct Element *expect) {
+    struct Element el = {0};
+    int exists = dict_get(key, &el);
+    int actual = element_equals(expect, &el);
+
+    assert(exists && actual);
+}
+
+
 static void test_dict_key_not_exists() {
     int expect = 0;
 
@@ -104,7 +114,7 @@ static void test_dict_key_exists() {
     struct Element dummy = {0};
 
     dict_clear();
-    dict_put("key", dummy);
+    dict_put("key", &dummy);
     int actual = dict_get("key", &dummy);
 
     assert(expect == actual);
@@ -115,11 +125,9 @@ static void test_dict_put_get() {
     struct Element expect = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
 
     dict_clear();
-    dict_put("key", input);
-    struct Element actual = {0};
-    dict_get("key", &actual);
+    dict_put("key", &input);
 
-    assert(element_equals(expect, actual));
+    assert_dict_contains("key", &expect);
 }
 
 static void test_dict_append_key() {
@@ -129,19 +137,11 @@ static void test_dict_append_key() {
     struct Element expect_2 = {ELEMENT_NUMBER, .u.number = 1};
 
     dict_clear();
-    dict_put("p", input_1);
-    dict_put("o", input_2);
+    dict_put("p", &input_1);
+    dict_put("o", &input_2);
 
-    struct Element actual_1 = {0};
-    struct Element actual_2 = {0};
-    int actual_key_exists_1 = dict_get("p", &actual_1);
-    int actual_key_eixsts_2 = dict_get("o", &actual_2);
-
-    assert(actual_key_exists_1
-            && actual_key_eixsts_2
-            && element_equals(expect_1, actual_1)
-            && element_equals(expect_2, actual_2));
-
+    assert_dict_contains("p", &expect_1);
+    assert_dict_contains("o", &expect_2);
 }
 
 static void test_dict_append_key_hash_collision() {
@@ -151,18 +151,11 @@ static void test_dict_append_key_hash_collision() {
     struct Element expect_2 = {ELEMENT_NUMBER, .u.number = 9};
 
     dict_clear();
-    dict_put("key", input_1);
-    dict_put("kye", input_2); /* this key causes a hash collision that depends on hash algorithm */
+    dict_put("key", &input_1);
+    dict_put("kye", &input_2); /* this key causes a hash collision that depends on hash algorithm */
 
-    struct Element actual_1 = {0};
-    struct Element actual_2 = {0};
-    int actual_key_exists_1 = dict_get("key", &actual_1);
-    int actual_key_eixsts_2 = dict_get("kye", &actual_2);
-
-    assert(actual_key_exists_1
-            && actual_key_eixsts_2
-            && element_equals(expect_1, actual_1)
-            && element_equals(expect_2, actual_2));
+    assert_dict_contains("key", &expect_1);
+    assert_dict_contains("kye", &expect_2);
 }
 
 static void test_dict_overwrite() {
@@ -171,13 +164,10 @@ static void test_dict_overwrite() {
     struct Element expect = {ELEMENT_LITERAL_NAME, .u.name= "abc"};
 
     dict_clear();
-    dict_put("key", input_1);
-    dict_put("key", input_2);
+    dict_put("key", &input_1);
+    dict_put("key", &input_2);
 
-    struct Element actual = {0};
-    dict_get("key", &actual);
-
-    assert(element_equals(expect, actual));
+    assert_dict_contains("key", &expect);
 }
 
 __attribute__((unused))

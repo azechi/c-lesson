@@ -17,11 +17,11 @@ struct Element *try_stack_pop() {
     return NULL;
 }
 
-void stack_push(const struct Element el) {
+void stack_push(const struct Element *el) {
     assert(sp < STACK_SIZE);
 
     if(sp < STACK_SIZE) {
-        stack[sp++] = el;
+        stack[sp++] = *el;
     }
 }
 
@@ -32,76 +32,73 @@ void stack_clear() {
 void stack_print_all() { 
     int i = sp;
     while(i > 0) {
-        element_print(stack[--i]);
+        element_print(&stack[--i]);
     };
 }
 
 
 /* unit tests */
 
-static void test_try_stack_pop() {
+static void assert_stack_empty() {
     struct Element *actual = try_stack_pop();
-
-    assert(actual == NULL);
+    assert(!actual);
 }
 
-static void test_stack_push() {
-    struct Element input = {0};
+static void assert_stack_pop(const struct Element *expect) {
+    struct Element *el = try_stack_pop();
 
-    stack_push(input);
+    int actual = element_equals(expect, el);
+    assert(actual);
+}
 
-    assert(sp == 1);
-    assert(element_equals(stack[0], input));
+
+static void test_try_stack_pop() {
+    assert_stack_empty();
 }
 
 static void test_stack_push_pop() {
     struct Element input = {0};
+    struct Element expect = {0};
 
-    struct Element actual;
+    stack_push(&input);
 
-    stack_push(input);
-    actual = *try_stack_pop();
-
-    assert(sp == 0);
-    assert(element_equals(actual, input));
+    assert_stack_pop(&expect);
+    assert_stack_empty();
 }
 
 static void test_stack_push_push_pop_pop() {
     struct Element input_1 = {ELEMENT_NUMBER, {0}};
     struct Element input_2 = {ELEMENT_NUMBER, {1}};
 
-    struct Element actual;
+    struct Element expect_1 = {ELEMENT_NUMBER, {1}};
+    struct Element expect_2 = {ELEMENT_NUMBER, {0}};
 
-    stack_push(input_1);
-    stack_push(input_2);
+    stack_push(&input_1);
+    stack_push(&input_2);
 
-    actual = *try_stack_pop();
-    assert(element_equals(actual, input_2));
-
-    actual = *try_stack_pop();
-    assert(element_equals(actual, input_1));
+    assert_stack_pop(&expect_1);
+    assert_stack_pop(&expect_2);
+    assert_stack_empty();
 }
 
 
 __attribute__((unused))
 static void test_all() {
-    stack_clear();
     test_try_stack_pop();
-
-    stack_clear();
-    test_stack_push();
-
-    stack_clear();
     test_stack_push_pop();
-
-    stack_clear();
     test_stack_push_push_pop_pop();
 
+    struct Element el = {ELEMENT_NUMBER, .u.number = 123};
+    stack_push(&el);
 
-    stack_push(element_number(123));
-    stack_push(element_number(45));
-    stack_push(element_literal_name("some"));
-    stack_push(element_literal_name("some2"));
+    el = (struct Element){ELEMENT_NUMBER, .u.number = 45};
+    stack_push(&el);
+
+    el = (struct Element){ELEMENT_LITERAL_NAME, .u.name = "some"};
+    stack_push(&el);
+
+    el = (struct Element){ELEMENT_LITERAL_NAME, .u.name = "some2"};
+    stack_push(&el);
 
     stack_print_all();
 }

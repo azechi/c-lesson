@@ -58,11 +58,19 @@ struct ElementArray {
     struct Element elements[0];
 };
 
+struct AutoElementArray {
+    int size;
+    struct ElementArray *var_array;
+};
+
 struct ElementArray *new_element_array(int length, const struct Element *elements);
 
 int element_array_equals(const struct ElementArray *e1, const struct ElementArray *e2);
 
 void element_array_print(const struct ElementArray *ea);
+
+void auto_element_array_init(int initial_size, struct AutoElementArray *out);
+void auto_element_array_add_element(struct AutoElementArray * array, const struct Element *el);
 
 /*
    return one character and move cursor.

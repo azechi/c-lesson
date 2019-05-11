@@ -88,7 +88,6 @@ static void register_primitive() {
     dict_put_c_func("div", div_op);
 }
 
-#define MAX_OP_NUMBERS 256
 static void eval_executable_name(const char *name);
 static void eval_exec_array(const struct ElementArray *ea);
 
@@ -146,10 +145,15 @@ static struct Element to_element(const struct Token *token) {
 
     switch(token->ltype) {
         case LEX_NUMBER:
+            el.etype = ELEMENT_NUMBER;
             el.u.number = token->u.number;
             break;
         case LEX_EXECUTABLE_NAME:
+            el.etype = ELEMENT_EXECUTABLE_NAME;
+            el.u.name = token->u.name;
+            break;
         case LEX_LITERAL_NAME:
+            el.etype = ELEMENT_LITERAL_NAME;
             el.u.name = token->u.name;
             break;
         default:
@@ -157,28 +161,36 @@ static struct Element to_element(const struct Token *token) {
             break;
     }
 
-    el.etype = (enum ElementType)token->ltype;
     return el;
 }
 
-static struct Element compile_exec_array(int ch, int *out_ch) {
-    struct Element elements[MAX_OP_NUMBERS];
-    struct Token token = {LEX_UNKNOWN, {0}};
+#define COMPILE_EXEC_ARRAY_BUFFER_INITIAL_SIZE 0
 
-    int i = 0;
+static struct Element compile_exec_array(int ch, int *out_ch) {
+    struct AutoElementArray elements = {0};
+    struct Token token = {LEX_UNKNOWN, {0}};
+    
+    auto_element_array_init(COMPILE_EXEC_ARRAY_BUFFER_INITIAL_SIZE, &elements);
+
     do {
         ch = parse_one(ch, &token);
         switch(token.ltype) {
             case LEX_NUMBER:
             case LEX_EXECUTABLE_NAME:
             case LEX_LITERAL_NAME:
-                elements[i++] = to_element(&token);
+                {
+                    struct Element el = to_element(&token);
+                    auto_element_array_add_element(&elements, &el);
+                }
                 break;
             case LEX_CLOSE_CURLY:
             case LEX_SPACE:
                 break;
             case LEX_OPEN_CURLY:
-                elements[i++] = compile_exec_array(ch, &ch);
+                {
+                    struct Element el = compile_exec_array(ch, &ch);
+                    auto_element_array_add_element(&elements, &el);
+                }
                 break;
             case LEX_END_OF_FILE:
             default:
@@ -189,10 +201,8 @@ static struct Element compile_exec_array(int ch, int *out_ch) {
 
     *out_ch = ch;
 
-    struct Element el = {ELEMENT_EXEC_ARRAY, {0}};
-    el.u.exec_array = new_element_array(i, elements);
-
-    return el;
+    struct ElementArray *ea = new_element_array(elements.var_array->len, elements.var_array->elements);
+    return (struct Element){ELEMENT_EXEC_ARRAY, .u.exec_array = ea};
 }
 
 void eval() {

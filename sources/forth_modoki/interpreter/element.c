@@ -32,19 +32,47 @@ int element_equals(const struct Element *e1, const struct Element *e2) {
     return 0;
 }
 
-struct ElementArray *new_element_array(int length, const struct Element *elements) {
-    int size = sizeof(struct ElementArray) + (sizeof(struct Element) * length);
-    struct ElementArray *ea = malloc(size);
+static struct ElementArray *alloc_element_array(int len) {
+    int size = sizeof(struct ElementArray) + (sizeof(struct Element) * len);
+    return malloc(size);
+}
 
-    ea->len = length;
-    memcpy(ea->elements, elements, sizeof(struct Element) * length);
+struct ElementArray *new_element_array(int len, const struct Element *elements) {
+    struct ElementArray *ea = alloc_element_array(len);
+
+    ea->len = len;
+    memcpy(ea->elements, elements, sizeof(struct Element) * len);
     return ea;
 }
 
 
+void auto_element_array_init(int initial_size, struct AutoElementArray *out) {
+    struct AutoElementArray eae = {0};
+
+    struct ElementArray *ea = alloc_element_array(initial_size);
+    ea->len = 0;
+
+    eae.size = initial_size;
+    eae.var_array = ea;
+
+    *out = eae;
+}
+
+void auto_element_array_add_element(struct AutoElementArray *aea, const struct Element *el) {
+
+    if(aea->size == aea->var_array->len) {
+        aea->size = (aea->size + 1) * 2;
+        int ea_size = sizeof(struct ElementArray) + (sizeof(struct Element) * aea->size);
+        struct ElementArray *new_ea = realloc(aea->var_array, ea_size);
+        aea->var_array = new_ea;
+    }
+
+    aea->var_array->elements[aea->var_array->len++] = *el;
+}
+
 static void print_indent(int i) {
     char str[5]; /* "%99c"" */
-    sprintf(str, "%%%dc", i % 100); 
+    sprintf(str, "%%%dc", i % 100);
     printf(str, ' ');
 }
 
@@ -76,7 +104,7 @@ static void element_print_with_indent(int indent, const struct Element *el) {
             printf("exec array  len %d\n", el->u.exec_array->len);
             element_array_print_with_indent(indent + 4, el->u.exec_array);
             break;
-        default: 
+        default:
             printf("unknown %d", el->etype);
             break;
     }
@@ -89,6 +117,11 @@ void element_print(const struct Element *el) {
 void element_array_print(const struct ElementArray *ea) {
     printf("len %d\n", ea->len);
     element_array_print_with_indent(0, ea);
+}
+
+void auto_element_array_print(const struct AutoElementArray *aea) {
+    printf("size %d\n", aea->size);
+    element_array_print(aea->var_array);
 }
 
 
@@ -215,6 +248,71 @@ static void test_element_array_equals_nested() {
     assert_element_array_equals(expect_true, expect_false, input);
 }
 
+
+static void verify_auto_element_array_init(int input) {
+    struct AutoElementArray aea = {0};
+    auto_element_array_init(input, &aea);
+
+    assert(input == aea.size);
+    assert(0 == aea.var_array->len);
+}
+
+static void test_auto_element_array_init() {
+    verify_auto_element_array_init(0);
+    verify_auto_element_array_init(1);
+}
+
+static void verify_auto_element_array_increase(int input_count, int expect_size) {
+    struct AutoElementArray aea = {0};
+    auto_element_array_init(0, &aea);
+
+    int i = input_count;
+    while(i--) {
+        struct Element dummy = {0};
+        auto_element_array_add_element(&aea, &dummy);
+    }
+
+    assert(input_count == aea.var_array->len);
+    assert(expect_size == aea.size);
+}
+
+static void test_auto_element_array_increase() {
+    /* below is expecting values that depend on an increase algorithm */
+    verify_auto_element_array_increase(0, 0);
+    verify_auto_element_array_increase(1, 2);
+    verify_auto_element_array_increase(3, 6);
+    verify_auto_element_array_increase(7, 14);
+    verify_auto_element_array_increase(15, 30);
+}
+
+static void verify_auto_element_array_add_element(int input_size, struct Element input_elements[]) {
+    struct ElementArray *expect = new_element_array(input_size, input_elements);
+
+    struct AutoElementArray aea = {0};
+
+    auto_element_array_init(0, &aea);
+
+    int i;
+    for(i = 0; i < input_size; i++) {
+        auto_element_array_add_element(&aea, &input_elements[i]);
+    }
+
+    int eq = element_array_equals(expect, aea.var_array);
+    assert(eq);
+}
+
+#define VERIFY_AUTO_ELEMENT_ARRAY_ADD_ELEMENT(a) verify_auto_element_array_add_element(sizeof(a) / sizeof(struct Element), a)
+
+static void test_auto_element_array_add_element() {
+    struct Element input[] = {
+        {ELEMENT_NUMBER, .u.number = 1},
+        {ELEMENT_NUMBER, .u.number = 2},
+        {ELEMENT_NUMBER, .u.number = 3}
+    };
+
+    VERIFY_AUTO_ELEMENT_ARRAY_ADD_ELEMENT(input);
+}
+
 #undef NEW_ELEMENT_ARRAY
 
 __attribute__((unused))
@@ -227,10 +325,14 @@ __attribute__((unused))
         test_element_array_equals_length();
         test_element_array_equals_element();
         test_element_array_equals_nested();
+
+        test_auto_element_array_init();
+        test_auto_element_array_increase();
+        test_auto_element_array_add_element();
     }
 
 #if 0
-int main() { 
+int main() {
     test_all();
 
     return 0;

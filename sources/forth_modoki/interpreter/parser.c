@@ -1,8 +1,9 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include "clesson.h"
 
+#include "parser.h"
 
 #define NAME_SIZE 256
 
@@ -265,8 +266,7 @@ static void test_parse_one_close_curly() {
     assert(expect_onechar == actual.u.onechar);
 }
 
-__attribute__((unused))
-static void unit_tests() {
+void parser_test_all() {
     test_parse_one_empty_should_return_END_OF_FILE();
     test_parse_one_number();
 

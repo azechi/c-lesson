@@ -1,54 +1,10 @@
 #include <assert.h>
-#include "clesson.h"
-
-
-static Element *stack_pop() {
-    Element *el = try_stack_pop();
-    if(!el){
-        assert_fail("STACKUNDERFLOW");
-    }
-    return el;
-}
-
-static int stack_pop_number() {
-    Element *el = stack_pop();
-
-    if(ELEMENT_NUMBER != el->etype){
-        assert_fail("NOT NUMBER ELEMENT");
-    }
-
-    return el->u.number;
-}
-
-static char *stack_pop_literal_name() {
-    Element *el = stack_pop();
-
-    if(ELEMENT_LITERAL_NAME != el->etype) {
-        assert_fail("NOT LITERAL_NAME");
-    }
-
-    return el->u.name;
-}
-
-static ElementArray *stack_pop_exec_array() {
-    Element *el = stack_pop();
-
-    if(ELEMENT_EXEC_ARRAY != el->etype) {
-        assert_fail("NOT EXEC ARRAY");
-    }
-
-    return el->u.exec_array;
-}
-
-static void stack_push_number(int i) {
-    Element el = {ELEMENT_NUMBER, .u.number = i};
-    stack_push(&el);
-}
-
-static void dict_put_c_func(const char *name, void(*c_func)()) {
-    Element el = {ELEMENT_C_FUNC, .u.cfunc = c_func};
-    dict_put(name, &el);
-}
+#include "util.h"
+#include "parser.h"
+#include "stack.h"
+#include "dict.h"
+#include "element.h"
+#include "auto_element_array.h"
 
 /* primitive */
 
@@ -474,38 +430,46 @@ static void test_eval_executable_array_nested_nested() {
 }
 
 
-__attribute__((unused))
-    static void test_all() {
+void eval_test_all() {
 
-        test_eval_empty();
-        test_eval_num_one();
-        test_eval_num_two();
-        test_eval_num_add();
+    test_eval_empty();
+    test_eval_num_one();
+    test_eval_num_two();
+    test_eval_num_add();
 
-        test_eval_literal_name();
-        test_eval_def_dict_put();
-        test_eval_def_dict_get();
+    test_eval_literal_name();
+    test_eval_def_dict_put();
+    test_eval_def_dict_get();
 
-        test_eval_sub();
-        test_eval_mul();
-        test_eval_div();
-        test_eval_div_truncation();
+    test_eval_sub();
+    test_eval_mul();
+    test_eval_div();
+    test_eval_div_truncation();
 
-        test_compile_executable_array_empty();
-        test_compile_executable_array_num();
-        test_compile_executable_array_literal_name();
-        test_compile_executable_array_executable_name();
-        test_compile_executable_array_multiple_elements();
-        test_compile_executable_array_multiple_arrays();
-        test_compile_executable_array_nested();
+    test_compile_executable_array_empty();
+    test_compile_executable_array_num();
+    test_compile_executable_array_literal_name();
+    test_compile_executable_array_executable_name();
+    test_compile_executable_array_multiple_elements();
+    test_compile_executable_array_multiple_arrays();
+    test_compile_executable_array_nested();
 
-        test_eval_executable_array();
-        test_eval_executable_array_nested_nested();
-    }
+    test_eval_executable_array();
+    test_eval_executable_array_nested_nested();
+}
 
 #if 1
 int main() {
-    test_all();
+    
+    parser_test_all();
+    stack_test_all();
+    dict_test_all();
+
+    element_test_all();
+    element_array_test_all();
+    auto_element_array_test_all();
+
+    eval_test_all();
 
     verify_stack_pop_number("1 2 3 add add 4 5 6 7 8 9 add add add add add add", 45);
 

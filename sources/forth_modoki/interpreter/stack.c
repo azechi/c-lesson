@@ -1,7 +1,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include "clesson.h"
+
+#include "util.h"
+#include "stack.h"
 
 #define STACK_SIZE 1024
 
@@ -17,6 +19,50 @@ Element *try_stack_pop() {
     return NULL;
 }
 
+Element *stack_pop() {
+    Element *el = try_stack_pop();
+    if(!el){
+        assert_fail("STACKUNDERFLOW");
+    }
+    return el;
+}
+
+int stack_pop_number() {
+    Element *el = stack_pop();
+
+    if(ELEMENT_NUMBER != el->etype){
+        assert_fail("NOT NUMBER ELEMENT");
+    }
+
+    return el->u.number;
+}
+
+char *stack_pop_literal_name() {
+    Element *el = stack_pop();
+
+    if(ELEMENT_LITERAL_NAME != el->etype) {
+        assert_fail("NOT LITERAL_NAME");
+    }
+
+    return el->u.name;
+}
+
+ElementArray *stack_pop_exec_array() {
+    Element *el = stack_pop();
+
+    if(ELEMENT_EXEC_ARRAY != el->etype) {
+        assert_fail("NOT EXEC ARRAY");
+    }
+
+    return el->u.exec_array;
+}
+
+void stack_push_number(int i) {
+    Element el = {ELEMENT_NUMBER, .u.number = i};
+    stack_push(&el);
+}
+
+
 void stack_push(const Element *el) {
     assert(sp < STACK_SIZE);
 
@@ -25,9 +71,11 @@ void stack_push(const Element *el) {
     }
 }
 
+
 void stack_clear() {
     sp = 0;
 }
+
 
 void stack_print_all() { 
     int i = sp;
@@ -82,8 +130,7 @@ static void test_stack_push_push_pop_pop() {
 }
 
 
-__attribute__((unused))
-static void test_all() {
+void stack_test_all() {
     test_try_stack_pop();
     test_stack_push_pop();
     test_stack_push_push_pop_pop();

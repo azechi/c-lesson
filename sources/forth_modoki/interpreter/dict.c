@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
-#include "clesson.h"
+#include "util.h"
+#include "element.h"
 
 #define TABLE_SIZE 16
 
@@ -46,6 +47,10 @@ void dict_put(const char* key, const Element *el) {
     update_or_insert_list(&array[h], key, el);
 }
 
+void dict_put_c_func(const char *name, void(*c_func)()) {
+    Element el = {ELEMENT_C_FUNC, .u.cfunc = c_func};
+    dict_put(name, &el);
+}
 
 int dict_get(const char* key, Element *out_el) {
     int h = hash(key);
@@ -170,8 +175,7 @@ static void test_dict_overwrite() {
     assert_dict_contains("key", &expect);
 }
 
-__attribute__((unused))
-static void test_all() {
+void dict_test_all() {
     test_dict_key_not_exists();
     test_dict_key_exists();
     test_dict_append_key_hash_collision();

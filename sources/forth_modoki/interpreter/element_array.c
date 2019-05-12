@@ -5,6 +5,7 @@
 #include "util.h"
 #include "element.h"
 
+
 int element_array_equals(const ElementArray *e1, const ElementArray *e2) {
     int res = e1 && e2 && (e1->len == e2->len);
     int i = e1->len;
@@ -15,31 +16,13 @@ int element_array_equals(const ElementArray *e1, const ElementArray *e2) {
 }
 
 
-static ElementArray *alloc_element_array(int len) {
-    int size = sizeof(ElementArray) + (sizeof(Element) * len);
-    return malloc(size);
-}
-
 ElementArray *new_element_array(int len, const Element *elements) {
-    ElementArray *ea = alloc_element_array(len);
+    int array_size = sizeof(Element) * len;
+    ElementArray *ea = malloc(sizeof(ElementArray) + array_size);
 
     ea->len = len;
-    memcpy(ea->elements, elements, sizeof(Element) * len);
+    memcpy(ea->elements, elements, array_size);
     return ea;
-}
-
-
-
-
-void element_array_print_with_indent(int indent, const ElementArray *ea) {
-    int i;
-
-    print_indent(indent);
-    printf("len %d\n", ea->len);
-    
-    for(i = 0; i < ea->len; i++) {
-        element_print_with_indent(indent, &ea->elements[i]);
-    }
 }
 
 
@@ -47,6 +30,17 @@ void element_array_print(const ElementArray *ea) {
     element_array_print_with_indent(0, ea);
 }
 
+
+void element_array_print_with_indent(int indent, const ElementArray *ea) {
+    int i;
+
+    print_indent(indent);
+    printf("len %d\n", ea->len);
+
+    for(i = 0; i < ea->len; i++) {
+        element_print_with_indent(indent, &ea->elements[i]);
+    }
+}
 
 
 static void assert_element_array_equals(const ElementArray *expect_true, const ElementArray *expect_false, const ElementArray *input) {
@@ -125,18 +119,10 @@ static void test_element_array_equals_nested() {
 }
 
 
-
 void element_array_test_all() {
-
-
-        test_element_array_equals_empty();
-        test_element_array_equals_length();
-        test_element_array_equals_element();
-        test_element_array_equals_nested();
-
-
+    test_element_array_equals_empty();
+    test_element_array_equals_length();
+    test_element_array_equals_element();
+    test_element_array_equals_nested();
 }
-
-
-
 

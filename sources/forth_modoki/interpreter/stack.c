@@ -5,11 +5,11 @@
 
 #define STACK_SIZE 1024
 
-static struct Element stack[STACK_SIZE];
+static Element stack[STACK_SIZE];
 static int sp = 0; /* stack pointer */
 
 
-struct Element *try_stack_pop() {
+Element *try_stack_pop() {
     if(sp > 0) {
         return &stack[--sp];
     }
@@ -17,7 +17,7 @@ struct Element *try_stack_pop() {
     return NULL;
 }
 
-void stack_push(const struct Element *el) {
+void stack_push(const Element *el) {
     assert(sp < STACK_SIZE);
 
     if(sp < STACK_SIZE) {
@@ -40,12 +40,12 @@ void stack_print_all() {
 /* unit tests */
 
 static void assert_stack_empty() {
-    struct Element *actual = try_stack_pop();
+    Element *actual = try_stack_pop();
     assert(!actual);
 }
 
-static void assert_stack_pop(const struct Element *expect) {
-    struct Element *el = try_stack_pop();
+static void assert_stack_pop(const Element *expect) {
+    Element *el = try_stack_pop();
 
     int actual = element_equals(expect, el);
     assert(actual);
@@ -57,8 +57,8 @@ static void test_try_stack_pop() {
 }
 
 static void test_stack_push_pop() {
-    struct Element input = {0};
-    struct Element expect = {0};
+    Element input = {0};
+    Element expect = {0};
 
     stack_push(&input);
 
@@ -67,11 +67,11 @@ static void test_stack_push_pop() {
 }
 
 static void test_stack_push_push_pop_pop() {
-    struct Element input_1 = {ELEMENT_NUMBER, {0}};
-    struct Element input_2 = {ELEMENT_NUMBER, {1}};
+    Element input_1 = {ELEMENT_NUMBER, {0}};
+    Element input_2 = {ELEMENT_NUMBER, {1}};
 
-    struct Element expect_1 = {ELEMENT_NUMBER, {1}};
-    struct Element expect_2 = {ELEMENT_NUMBER, {0}};
+    Element expect_1 = {ELEMENT_NUMBER, {1}};
+    Element expect_2 = {ELEMENT_NUMBER, {0}};
 
     stack_push(&input_1);
     stack_push(&input_2);
@@ -88,16 +88,16 @@ static void test_all() {
     test_stack_push_pop();
     test_stack_push_push_pop_pop();
 
-    struct Element el = {ELEMENT_NUMBER, .u.number = 123};
+    Element el = {ELEMENT_NUMBER, .u.number = 123};
     stack_push(&el);
 
-    el = (struct Element){ELEMENT_NUMBER, .u.number = 45};
+    el = (Element){ELEMENT_NUMBER, .u.number = 45};
     stack_push(&el);
 
-    el = (struct Element){ELEMENT_LITERAL_NAME, .u.name = "some"};
+    el = (Element){ELEMENT_LITERAL_NAME, .u.name = "some"};
     stack_push(&el);
 
-    el = (struct Element){ELEMENT_LITERAL_NAME, .u.name = "some2"};
+    el = (Element){ELEMENT_LITERAL_NAME, .u.name = "some2"};
     stack_push(&el);
 
     stack_print_all();

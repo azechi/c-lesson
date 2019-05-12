@@ -2,8 +2,8 @@
 #include "clesson.h"
 
 
-static struct Element *stack_pop() {
-    struct Element *el = try_stack_pop();
+static Element *stack_pop() {
+    Element *el = try_stack_pop();
     if(!el){
         assert_fail("STACKUNDERFLOW");
     }
@@ -11,7 +11,7 @@ static struct Element *stack_pop() {
 }
 
 static int stack_pop_number() {
-    struct Element *el = stack_pop();
+    Element *el = stack_pop();
 
     if(ELEMENT_NUMBER != el->etype){
         assert_fail("NOT NUMBER ELEMENT");
@@ -21,7 +21,7 @@ static int stack_pop_number() {
 }
 
 static char *stack_pop_literal_name() {
-    struct Element *el = stack_pop();
+    Element *el = stack_pop();
 
     if(ELEMENT_LITERAL_NAME != el->etype) {
         assert_fail("NOT LITERAL_NAME");
@@ -30,8 +30,8 @@ static char *stack_pop_literal_name() {
     return el->u.name;
 }
 
-static struct ElementArray *stack_pop_exec_array() {
-    struct Element *el = stack_pop();
+static ElementArray *stack_pop_exec_array() {
+    Element *el = stack_pop();
 
     if(ELEMENT_EXEC_ARRAY != el->etype) {
         assert_fail("NOT EXEC ARRAY");
@@ -41,19 +41,19 @@ static struct ElementArray *stack_pop_exec_array() {
 }
 
 static void stack_push_number(int i) {
-    struct Element el = {ELEMENT_NUMBER, .u.number = i};
+    Element el = {ELEMENT_NUMBER, .u.number = i};
     stack_push(&el);
 }
 
 static void dict_put_c_func(const char *name, void(*c_func)()) {
-    struct Element el = {ELEMENT_C_FUNC, .u.cfunc = c_func};
+    Element el = {ELEMENT_C_FUNC, .u.cfunc = c_func};
     dict_put(name, &el);
 }
 
 /* primitive */
 
 static void def_op() {
-    struct Element *val = stack_pop();
+    Element *val = stack_pop();
     char *name = stack_pop_literal_name();
     dict_put(name, val);
 }
@@ -89,15 +89,15 @@ static void register_primitive() {
 }
 
 static void eval_executable_name(const char *name);
-static void eval_exec_array(const struct ElementArray *ea);
+static void eval_exec_array(const ElementArray *ea);
 
 
-static void eval_exec_array(const struct ElementArray *ea) {
+static void eval_exec_array(const ElementArray *ea) {
     int i;
     int len = ea->len;
 
     for(i = 0; i < len; i++) {
-        const struct Element *el = &ea->elements[i];
+        const Element *el = &ea->elements[i];
 
         switch(el->etype) {
             case ELEMENT_NUMBER:
@@ -121,7 +121,7 @@ static void eval_exec_array(const struct ElementArray *ea) {
 }
 
 static void eval_executable_name(const char *name) {
-    struct Element el = {0};
+    Element el = {0};
     if(!dict_get(name, &el)) {
         assert_fail("EXECUTABLE NAME NOT FOUND");
         return;
@@ -140,8 +140,8 @@ static void eval_executable_name(const char *name) {
     }
 }
 
-static struct Element to_element(const struct Token *token) {
-    struct Element el = {0};
+static Element to_element(const Token *token) {
+    Element el = {0};
 
     switch(token->ltype) {
         case LEX_NUMBER:
@@ -166,9 +166,9 @@ static struct Element to_element(const struct Token *token) {
 
 #define COMPILE_EXEC_ARRAY_BUFFER_INITIAL_SIZE 0
 
-static struct Element compile_exec_array(int ch, int *out_ch) {
-    struct AutoElementArray elements = {0};
-    struct Token token = {LEX_UNKNOWN, {0}};
+static Element compile_exec_array(int ch, int *out_ch) {
+    AutoElementArray elements = {0};
+    Token token = {LEX_UNKNOWN, {0}};
     
     auto_element_array_init(COMPILE_EXEC_ARRAY_BUFFER_INITIAL_SIZE, &elements);
 
@@ -179,7 +179,7 @@ static struct Element compile_exec_array(int ch, int *out_ch) {
             case LEX_EXECUTABLE_NAME:
             case LEX_LITERAL_NAME:
                 {
-                    struct Element el = to_element(&token);
+                    Element el = to_element(&token);
                     auto_element_array_add_element(&elements, &el);
                 }
                 break;
@@ -188,7 +188,7 @@ static struct Element compile_exec_array(int ch, int *out_ch) {
                 break;
             case LEX_OPEN_CURLY:
                 {
-                    struct Element el = compile_exec_array(ch, &ch);
+                    Element el = compile_exec_array(ch, &ch);
                     auto_element_array_add_element(&elements, &el);
                 }
                 break;
@@ -201,13 +201,13 @@ static struct Element compile_exec_array(int ch, int *out_ch) {
 
     *out_ch = ch;
 
-    struct ElementArray *ea = new_element_array(elements.var_array->len, elements.var_array->elements);
-    return (struct Element){ELEMENT_EXEC_ARRAY, .u.exec_array = ea};
+    ElementArray *ea = new_element_array(elements.var_array->len, elements.var_array->elements);
+    return (Element){ELEMENT_EXEC_ARRAY, .u.exec_array = ea};
 }
 
 void eval() {
     int ch = EOF;
-    struct Token token = {
+    Token token = {
         LEX_UNKNOWN,
         {0}
     };
@@ -219,7 +219,7 @@ void eval() {
                 case LEX_NUMBER:
                 case LEX_LITERAL_NAME:
                     {
-                        struct Element el = to_element(&token);
+                        Element el = to_element(&token);
                         stack_push(&el);
                     }
                     break;
@@ -228,7 +228,7 @@ void eval() {
                     break;
                 case LEX_OPEN_CURLY:
                     {
-                        struct Element el = compile_exec_array(ch, &ch);
+                        Element el = compile_exec_array(ch, &ch);
                         stack_push(&el);
                     }
                     break;
@@ -262,7 +262,7 @@ static void call_eval(const char *input) {
 }
 
 static void assert_dict_contains_number(const char *expect_key, int expect_number) {
-    struct Element actual = {0};
+    Element actual = {0};
 
     int exists = dict_get(expect_key, &actual);
     int eq_type = ELEMENT_NUMBER == actual.etype;
@@ -271,8 +271,8 @@ static void assert_dict_contains_number(const char *expect_key, int expect_numbe
     assert(exists && eq_type && eq_number);
 }
 
-static void assert_stack(int expect_length, const struct Element expect_elements[]){
-    const struct Element *el;
+static void assert_stack(int expect_length, const Element expect_elements[]){
+    const Element *el;
     int i;
     for(i = 0; i < expect_length; i++) {
         el = stack_pop();
@@ -303,27 +303,27 @@ static void verify_stack_pop_number(const char *input, int expect) {
     assert_stack(0, NULL);
 }
 
-static void assert_pop_exec_array(int expect_len, const struct Element *expect_array) {
-    struct ElementArray *expect = new_element_array(expect_len, expect_array);
-    struct ElementArray *actual = stack_pop_exec_array();
+static void assert_pop_exec_array(int expect_len, const Element *expect_array) {
+    ElementArray *expect = new_element_array(expect_len, expect_array);
+    ElementArray *actual = stack_pop_exec_array();
 
     int eq = element_array_equals(expect, actual);
     assert(eq);
 }
 
-static void verify_stack_pop_exec_array(const char *input, int expect_len, const struct Element *expect_array) {
+static void verify_stack_pop_exec_array(const char *input, int expect_len, const Element *expect_array) {
     call_eval(input);
     assert_pop_exec_array(expect_len, expect_array);
 }
 
 
-#define NEW_ELEMENT_ARRAY(a) new_element_array(sizeof(a) / sizeof(struct Element), a)
+#define NEW_ELEMENT_ARRAY(a) new_element_array(sizeof(a) / sizeof(Element), a)
 
-#define ASSERT_POP_EXEC_ARRAY(a) assert_pop_exec_array(sizeof(a) / sizeof(struct Element), a)
+#define ASSERT_POP_EXEC_ARRAY(a) assert_pop_exec_array(sizeof(a) / sizeof(Element), a)
 
-#define VERIFY_STACK_POP_EXEC_ARRAY(a, b) verify_stack_pop_exec_array(a, sizeof(b) / sizeof(struct Element), b)
+#define VERIFY_STACK_POP_EXEC_ARRAY(a, b) verify_stack_pop_exec_array(a, sizeof(b) / sizeof(Element), b)
 
-#define ASSSERT_STACK(a) assert_stack(sizeof(a) / sizeof(struct Element), a)
+#define ASSSERT_STACK(a) assert_stack(sizeof(a) / sizeof(Element), a)
 
 
 static void test_eval_empty() {
@@ -378,14 +378,14 @@ static void test_eval_div_truncation() {
 
 static void test_compile_executable_array_empty() {
     char *input = "{}";
-    struct Element expect[] = {};
+    Element expect[] = {};
 
     VERIFY_STACK_POP_EXEC_ARRAY(input, expect);
 }
 
 static void test_compile_executable_array_num() {
     char *input = "{1}";
-    struct Element expect[] = {
+    Element expect[] = {
         {ELEMENT_NUMBER, .u.number = 1}
     };
 
@@ -394,7 +394,7 @@ static void test_compile_executable_array_num() {
 
 static void test_compile_executable_array_literal_name() {
     char *input = "{/abc}";
-    struct Element expect[] = {
+    Element expect[] = {
         {ELEMENT_LITERAL_NAME, .u.name = "abc"}
     };
 
@@ -403,7 +403,7 @@ static void test_compile_executable_array_literal_name() {
 
 static void test_compile_executable_array_executable_name() {
     char *input = "{abc}";
-    struct Element expect[] = {
+    Element expect[] = {
         {ELEMENT_EXECUTABLE_NAME, .u.name = "abc"}
     };
 
@@ -412,7 +412,7 @@ static void test_compile_executable_array_executable_name() {
 
 static void test_compile_executable_array_multiple_elements() {
     char *input = "{1 2}";
-    struct Element expect[] = {
+    Element expect[] = {
         {ELEMENT_NUMBER, .u.number = 1},
         {ELEMENT_NUMBER, .u.number = 2}
     };
@@ -423,10 +423,10 @@ static void test_compile_executable_array_multiple_elements() {
 
 static void test_compile_executable_array_multiple_arrays() {
     char *input = "{1} {2}";
-    struct Element expect1[] = {
+    Element expect1[] = {
         {ELEMENT_NUMBER, .u.number = 2}
     };
-    struct Element expect2[] = {
+    Element expect2[] = {
         {ELEMENT_NUMBER, .u.number = 1}
     };
 
@@ -439,10 +439,10 @@ static void test_compile_executable_array_multiple_arrays() {
 
 static void test_compile_executable_array_nested() {
     char *input = "{1 {2} 3}";
-    struct Element expect_contents[] = {
+    Element expect_contents[] = {
         {ELEMENT_NUMBER, .u.number = 2}
     };
-    struct Element expect[] = {
+    Element expect[] = {
         {ELEMENT_NUMBER, .u.number = 1},
         {ELEMENT_EXEC_ARRAY, .u.exec_array = NEW_ELEMENT_ARRAY(expect_contents)},
         {ELEMENT_NUMBER, .u.number = 3}
@@ -460,7 +460,7 @@ static void test_eval_executable_array_nested_nested() {
                    "/YY {4 ZZ 5} def" \
                    "/XX {1 2 YY 3} def" \
                    " XX";
-    struct Element expect[] = {
+    Element expect[] = {
         {ELEMENT_NUMBER, .u.number = 3},
         {ELEMENT_NUMBER, .u.number = 5},
         {ELEMENT_NUMBER, .u.number = 6},

@@ -7,70 +7,67 @@
 
 int streq(const char *s1, const char *s2);
 
-enum LexicalType {
+typedef enum LexicalType_ {
+    LEX_UNKNOWN = 0,
     LEX_NUMBER,
     LEX_SPACE,
     LEX_EXECUTABLE_NAME,
     LEX_LITERAL_NAME,
     LEX_OPEN_CURLY,
     LEX_CLOSE_CURLY,
-    LEX_END_OF_FILE,
-    LEX_UNKNOWN,
-
-    LEX_MAX = LEX_UNKNOWN
-};
+    LEX_END_OF_FILE
+} LexicalType;
 
 
-struct Token {
-    enum LexicalType ltype;
+typedef struct Token_ {
+    enum LexicalType_ ltype;
     union {
         int number;
         char onechar;
         char *name;
     } u;
-};
+} Token;
 
-enum ElementType {
-    ELEMENT_NUMBER = LEX_NUMBER,
-    ELEMENT_EXECUTABLE_NAME = LEX_EXECUTABLE_NAME,
-    ELEMENT_LITERAL_NAME = LEX_LITERAL_NAME,
-
-    ELEMENT_C_FUNC = LEX_MAX + 1,
+typedef enum ElementType_ {
+    ELEMENT_NUMBER,
+    ELEMENT_EXECUTABLE_NAME,
+    ELEMENT_LITERAL_NAME,
+    ELEMENT_C_FUNC,
     ELEMENT_EXEC_ARRAY
-};
+} ElementType;
 
-struct Element {
-    enum ElementType etype;
+typedef struct Element_ {
+    enum ElementType_ etype;
     union {
         int number;
         char *name;
         void (*cfunc)();
-        struct ElementArray *exec_array;
+        struct ElementArray_ *exec_array;
     } u;
-};
+} Element;
 
-int element_equals(const struct Element *e1, const struct Element *e2);
+int element_equals(const Element *e1, const Element *e2);
 
-void element_print(const struct Element *el);
+void element_print(const Element *el);
 
-struct ElementArray {
+typedef struct ElementArray_ {
     int len;
-    struct Element elements[0];
-};
+    struct Element_ elements[0];
+} ElementArray;
 
-struct AutoElementArray {
+typedef struct AutoElementArray_ {
     int size;
-    struct ElementArray *var_array;
-};
+    struct ElementArray_ *var_array;
+} AutoElementArray;
 
-struct ElementArray *new_element_array(int length, const struct Element *elements);
+ElementArray *new_element_array(int length, const Element *elements);
 
-int element_array_equals(const struct ElementArray *e1, const struct ElementArray *e2);
+int element_array_equals(const ElementArray *e1, const ElementArray *e2);
 
-void element_array_print(const struct ElementArray *ea);
+void element_array_print(const ElementArray *ea);
 
-void auto_element_array_init(int initial_size, struct AutoElementArray *out);
-void auto_element_array_add_element(struct AutoElementArray * array, const struct Element *el);
+void auto_element_array_init(int initial_size, AutoElementArray *out);
+void auto_element_array_add_element(AutoElementArray * array, const Element *el);
 
 /*
    return one character and move cursor.
@@ -79,15 +76,15 @@ void auto_element_array_add_element(struct AutoElementArray * array, const struc
 int cl_getc();
 void cl_getc_set_src(const char* str);
 
-int parse_one(int prev_ch, struct Token *out_token);
+int parse_one(int prev_ch, Token *out_token);
 
 
 /*
    return NULL if stack empty
    */
-struct Element *try_stack_pop();
+Element *try_stack_pop();
 
-void stack_push(const struct Element *el);
+void stack_push(const Element *el);
 
 void stack_clear();
 
@@ -97,9 +94,9 @@ void stack_print_all();
    return 1 if key exists
    return 0 if key not exists
    */
-int dict_get(const char* key, struct Element *out_el);
+int dict_get(const char* key, Element *out_el);
 
-void dict_put(const char* key, const struct Element *el);
+void dict_put(const char* key, const Element *el);
 
 void dict_clear();
 

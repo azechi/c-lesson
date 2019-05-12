@@ -34,7 +34,7 @@ static int is_alpha_digit(char ch) {
 }
 
 
-int parse_one(int prev_ch, struct Token *out_token) {
+int parse_one(int prev_ch, Token *out_token) {
     int ch;
 
     if(prev_ch == EOF) {
@@ -110,7 +110,7 @@ int parse_one(int prev_ch, struct Token *out_token) {
 
 void parser_print_all() {
     int ch = EOF;
-    struct Token token = {
+    Token token = {
         LEX_UNKNOWN,
         {0}
     };
@@ -151,7 +151,7 @@ static void test_parse_one_empty_should_return_END_OF_FILE() {
     char *input = "";
     int expect = LEX_END_OF_FILE;
 
-    struct Token token = {LEX_UNKNOWN, {0}};
+    Token token = {LEX_UNKNOWN, {0}};
     int ch;
 
     cl_getc_set_src(input);
@@ -165,7 +165,7 @@ static void test_parse_one_number() {
     char *input = "123";
     int expect = 123;
 
-    struct Token token = {LEX_UNKNOWN, {0}};
+    Token token = {LEX_UNKNOWN, {0}};
     int ch;
 
     cl_getc_set_src(input);
@@ -202,7 +202,7 @@ static void test_parse_one_executable_name() {
     int expect_type = LEX_EXECUTABLE_NAME;
     char* expect_name = "add";
 
-    struct Token actual = {LEX_UNKNOWN, {0}};
+    Token actual = {LEX_UNKNOWN, {0}};
     int ch;
 
     cl_getc_set_src(input);
@@ -219,7 +219,7 @@ static void test_parse_one_literal_name() {
     int expect_type = LEX_LITERAL_NAME;
     char* expect_name = "add";
 
-    struct Token actual = {LEX_UNKNOWN, {0}};
+    Token actual = {LEX_UNKNOWN, {0}};
     int ch;
 
     cl_getc_set_src(input);
@@ -236,7 +236,7 @@ static void test_parse_one_open_curly() {
     int expect_type = LEX_OPEN_CURLY;
     char expect_onechar = '{';
 
-    struct Token actual = {LEX_UNKNOWN, {0}};
+    Token actual = {LEX_UNKNOWN, {0}};
     int ch;
 
     cl_getc_set_src(input);
@@ -253,7 +253,7 @@ static void test_parse_one_close_curly() {
     int expect_type = LEX_CLOSE_CURLY;
     char expect_onechar = '}';
 
-    struct Token actual = {LEX_UNKNOWN, {0}};
+    Token actual = {LEX_UNKNOWN, {0}};
     int ch;
 
     cl_getc_set_src(input);

@@ -143,6 +143,31 @@ static int parse_one_name(int prev_ch, int ch, Token *out_token) {
     return ch;
 }
 
+
+static void verify_parse_one_space(const char *input, int expect_prev_ch) {
+    Token expect = {LEX_SPACE, .u.onechar = ' '};
+    verify_parse_one(input, &expect, expect_prev_ch);
+}
+
+static void test_parse_one_space() {
+    verify_parse_one_space(" ", EOF);
+    verify_parse_one_space("  ", EOF);
+    verify_parse_one_space("  /", '/');
+}
+
+static void test_parse_one_LF() {
+    verify_parse_one_space("\n ", EOF);
+    verify_parse_one_space(" \n  \n ", EOF);
+    verify_parse_one_space("  \n  \n-1 ", '-');
+}
+
+static void test_parse_one_comment() {
+    verify_parse_one_space("% 123 \n0", '0');
+    verify_parse_one_space("%123 \n0", '0');
+    verify_parse_one_space("% % \n0", '0');
+    verify_parse_one_space("% % ", EOF);
+}
+
 int parse_one(int prev_ch, Token *out_token) {
     int ch;
 
@@ -161,9 +186,17 @@ int parse_one(int prev_ch, Token *out_token) {
             || (prev_ch == '/' && is_alpha(ch)))
     {
         ch = parse_one_name(prev_ch, ch, out_token);
-    }  else if (prev_ch == ' ') {
+    } else if (prev_ch == '%') {
+        while (ch == '\n') {
+            ch = cl_getc();
+        }
+        out_token->ltype = LEX_SPACE;
+        out_token->u.onechar = ' ';
+    }  else if (prev_ch == ' '
+            || prev_ch == '\n') {
 
-        while (ch == ' '){
+        while (ch == ' '
+                || ch == '\n'){
             ch = cl_getc();
         }
 
@@ -182,44 +215,6 @@ int parse_one(int prev_ch, Token *out_token) {
     return ch;
 }
 
-
-void parser_print_all() {
-    int ch = EOF;
-    Token token = {
-        LEX_UNKNOWN,
-        {0}
-    };
-
-    do {
-        ch = parse_one(ch, &token);
-        if(token.ltype != LEX_UNKNOWN) {
-            switch(token.ltype) {
-                case LEX_NUMBER:
-                    printf("num: %d\n", token.u.number);
-                    break;
-                case LEX_SPACE:
-                    printf("space!\n");
-                    break;
-                case LEX_OPEN_CURLY:
-                    printf("Open curly brace '%c'\n", token.u.onechar);
-                    break;
-                case LEX_CLOSE_CURLY:
-                    printf("Close curly brace '%c'\n", token.u.onechar);
-                    break;
-                case LEX_EXECUTABLE_NAME:
-                    printf("EXECUTABLE_NAME: %s\n", token.u.name);
-                    break;
-                case LEX_LITERAL_NAME:
-                    printf("LITERAL_NAME: %s\n", token.u.name);
-                    break;
-
-                default:
-                    printf("Unknown type %d\n", token.ltype);
-                    break;
-            }
-        }
-    }while(ch != EOF);
-}
 
 
 static void test_parse_one_empty_should_return_END_OF_FILE() {
@@ -303,14 +298,44 @@ void parser_test_all() {
     test_parse_one_open_curly();
     test_parse_one_close_curly();
 
+    test_parse_one_space();
+    test_parse_one_LF();
+    test_parse_one_comment();
 }
 
-#if 0
-int main() {
-    unit_tests();
 
-    cl_getc_set_src("123 45 add /some { 2 3 add } def");
-    parser_print_all();
-    return 1;
+void parser_print_all() {
+    int ch = EOF;
+    Token token = {0};
+
+    do {
+        ch = parse_one(ch, &token);
+        if(token.ltype != LEX_UNKNOWN) {
+            switch(token.ltype) {
+                case LEX_NUMBER:
+                    printf("num: %d\n", token.u.number);
+                    break;
+                case LEX_SPACE:
+                    printf("space!\n");
+                    break;
+                case LEX_OPEN_CURLY:
+                    printf("Open curly brace '%c'\n", token.u.onechar);
+                    break;
+                case LEX_CLOSE_CURLY:
+                    printf("Close curly brace '%c'\n", token.u.onechar);
+                    break;
+                case LEX_EXECUTABLE_NAME:
+                    printf("EXECUTABLE_NAME: %s\n", token.u.name);
+                    break;
+                case LEX_LITERAL_NAME:
+                    printf("LITERAL_NAME: %s\n", token.u.name);
+                    break;
+
+                default:
+                    printf("Unknown type %d\n", token.ltype);
+                    break;
+            }
+        }
+    }while(ch != EOF);
 }
-#endif
+

@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 
 #include "util.h"
@@ -16,15 +15,21 @@ int element_array_equals(const ElementArray *e1, const ElementArray *e2) {
 }
 
 
-ElementArray *new_element_array(int len, const Element *elements) {
-    int array_size = sizeof(Element) * len;
-    ElementArray *ea = malloc(sizeof(ElementArray) + array_size);
+ElementArray *new_element_array(int initial_capacity) {
+    int size = sizeof(ElementArray) + sizeof(Element) * initial_capacity;
 
-    ea->len = len;
-    memcpy(ea->elements, elements, array_size);
-    return ea;
+    ElementArray *ar =  malloc(size);
+    ar->len = 0;
+    return ar;
 }
 
+
+ElementArray *new_element_array_from_fixed_array(int len, const Element elements[]) {
+    ElementArray *ea = new_element_array(len);
+    ea->len = len;
+    memcpy(ea->elements, elements, sizeof(Element) * len);
+    return ea;
+}
 
 void element_array_print(const ElementArray *ea) {
     element_array_print_with_indent(0, ea);
@@ -60,7 +65,7 @@ static void assert_element_array_equals(const ElementArray *expect_true, const E
 }
 
 
-#define NEW_ELEMENT_ARRAY(a) new_element_array(sizeof(a) / sizeof(Element), a)
+#define NEW_ELEMENT_ARRAY(a) new_element_array_from_fixed_array(sizeof(a) / sizeof(Element), a)
 
 
 static void test_element_array_equals_empty() {

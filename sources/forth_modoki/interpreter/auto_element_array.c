@@ -1,20 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 
 #include "auto_element_array.h"
 
 
 
-void auto_element_array_init(int initial_size, AutoElementArray *out) {
-    AutoElementArray eae = {0};
-
-    ElementArray *ea = new_element_array(0, NULL);
-
-    eae.size = initial_size;
-    eae.var_array = ea;
-
-    *out = eae;
+void auto_element_array_init(AutoElementArray *out) {
+    out->var_array = new_element_array(out->size);
 }
 
 void auto_element_array_add_element(AutoElementArray *aea, const Element *el) {
@@ -28,14 +22,23 @@ void auto_element_array_add_element(AutoElementArray *aea, const Element *el) {
 
     aea->var_array->elements[aea->var_array->len++] = *el;
 }
+
+void auto_element_array_trim_to_size(AutoElementArray *ae) {
+    int len = ae->var_array->len;
+    int size = sizeof(ElementArray) + sizeof(Element) * len;
+    ElementArray *ar = realloc(ae->var_array, size);
+    ae->var_array = ar;
+}
+
+
 void auto_element_array_print(const AutoElementArray *aea) {
     printf("size %d\n", aea->size);
     element_array_print(aea->var_array);
 }
 
 static void verify_auto_element_array_init(int input) {
-    AutoElementArray aea = {0};
-    auto_element_array_init(input, &aea);
+    AutoElementArray aea = {input};
+    auto_element_array_init(&aea);
 
     assert(input == aea.size);
     assert(0 == aea.var_array->len);
@@ -48,7 +51,7 @@ static void test_auto_element_array_init() {
 
 static void verify_auto_element_array_increase(int input_count, int expect_size) {
     AutoElementArray aea = {0};
-    auto_element_array_init(0, &aea);
+    auto_element_array_init(&aea);
 
     int i = input_count;
     while(i--) {
@@ -69,15 +72,16 @@ static void test_auto_element_array_increase() {
     verify_auto_element_array_increase(15, 30);
 }
 
-static void verify_auto_element_array_add_element(int input_size, Element input_elements[]) {
-    ElementArray *expect = new_element_array(input_size, input_elements);
+static void verify_auto_element_array_add_element(int input_len, Element input_elements[]) {
+    ElementArray *expect = new_element_array(input_len);
+    memcpy(expect->elements, input_elements, sizeof(Element) * input_len);
+    expect->len = input_len;
 
     AutoElementArray aea = {0};
-
-    auto_element_array_init(0, &aea);
+    auto_element_array_init(&aea);
 
     int i;
-    for(i = 0; i < input_size; i++) {
+    for(i = 0; i < input_len; i++) {
         auto_element_array_add_element(&aea, &input_elements[i]);
     }
 

@@ -93,7 +93,7 @@ static void test_element_equals_number() {
 }
 
 
-#define NEW_ELEMENT_ARRAY(a) new_element_array(sizeof(a) / sizeof(Element), a)
+#define NEW_ELEMENT_ARRAY(a) new_element_array_from_fixed_array(sizeof(a) / sizeof(Element), a)
 static void test_element_equals_exec_array() {
     Element input_array[] = {{ELEMENT_NUMBER, .u.number = 1}, {ELEMENT_NUMBER, .u.number = 2}};
     Element input = {ELEMENT_EXEC_ARRAY, .u.exec_array = NEW_ELEMENT_ARRAY(input_array)};

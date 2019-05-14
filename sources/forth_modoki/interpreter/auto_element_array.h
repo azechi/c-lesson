@@ -9,10 +9,12 @@ typedef struct AutoElementArray_ {
 } AutoElementArray;
 
 
-void auto_element_array_init(int initial_size, AutoElementArray *out);
+void auto_element_array_init(AutoElementArray *out);
 
 
 void auto_element_array_add_element(AutoElementArray * array, const Element *el);
+
+void auto_element_array_trim_to_size(AutoElementArray *ae);
 
 
 void auto_element_array_print();

@@ -19,6 +19,8 @@ void stack_push(const Element *el);
 
 void stack_push_number(int i);
 
+void stack_push_exec_array(ElementArray *ea);
+
 
 void stack_clear();
 

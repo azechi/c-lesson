@@ -5,50 +5,15 @@
 #include "dict.h"
 #include "element.h"
 #include "auto_element_array.h"
+#include "operator.h"
 
-/* primitive */
 
-static void def_op() {
-    Element *val = stack_pop();
-    char *name = stack_pop_literal_name();
-    dict_put(name, val);
-}
-
-static void add_op() {
-    int res = stack_pop_number() + stack_pop_number();
-    stack_push_number(res);
-}
-
-static void sub_op() {
-    int op2 = stack_pop_number();
-    int res = stack_pop_number() - op2;
-    stack_push_number(res);
-}
-
-static void mul_op() {
-    int res = stack_pop_number() * stack_pop_number();
-    stack_push_number(res);
-}
-
-static void div_op() {
-    int op2 = stack_pop_number();
-    int res = stack_pop_number() / op2;
-    stack_push_number(res);
-}
-
-static void register_primitive() {
-    dict_put_c_func("def", def_op);
-    dict_put_c_func("add", add_op);
-    dict_put_c_func("sub", sub_op);
-    dict_put_c_func("mul", mul_op);
-    dict_put_c_func("div", div_op);
-}
 
 static void eval_executable_name(const char *name);
-static void eval_exec_array(const ElementArray *ea);
+void eval_exec_array(const ElementArray *ea);
 
 
-static void eval_exec_array(const ElementArray *ea) {
+void eval_exec_array(const ElementArray *ea) {
     int i;
     int len = ea->len;
 
@@ -120,13 +85,12 @@ static Element to_element(const Token *token) {
     return el;
 }
 
-#define COMPILE_EXEC_ARRAY_BUFFER_INITIAL_SIZE 0
 
 static Element compile_exec_array(int ch, int *out_ch) {
     AutoElementArray elements = {0};
-    Token token = {LEX_UNKNOWN, {0}};
+    Token token = {0};
     
-    auto_element_array_init(COMPILE_EXEC_ARRAY_BUFFER_INITIAL_SIZE, &elements);
+    auto_element_array_init(&elements);
 
     do {
         ch = parse_one(ch, &token);
@@ -157,16 +121,13 @@ static Element compile_exec_array(int ch, int *out_ch) {
 
     *out_ch = ch;
 
-    ElementArray *ea = new_element_array(elements.var_array->len, elements.var_array->elements);
-    return (Element){ELEMENT_EXEC_ARRAY, .u.exec_array = ea};
+    auto_element_array_trim_to_size(&elements);
+    return (Element){ELEMENT_EXEC_ARRAY, .u.exec_array = elements.var_array};
 }
 
 void eval() {
     int ch = EOF;
-    Token token = {
-        LEX_UNKNOWN,
-        {0}
-    };
+    Token token = {0};
 
     do {
         ch = parse_one(ch, &token);
@@ -210,12 +171,13 @@ static void env_init(const char *input) {
 }
 
 
-/* unit tests */
-
-static void call_eval(const char *input) {
+void call_eval(const char *input) {
     env_init(input);
     eval();
 }
+
+
+/* unit tests */
 
 static void assert_dict_contains_number(const char *expect_key, int expect_number) {
     Element actual = {0};
@@ -260,7 +222,7 @@ static void verify_stack_pop_number(const char *input, int expect) {
 }
 
 static void assert_pop_exec_array(int expect_len, const Element *expect_array) {
-    ElementArray *expect = new_element_array(expect_len, expect_array);
+    ElementArray *expect = new_element_array_from_fixed_array(expect_len, expect_array);
     ElementArray *actual = stack_pop_exec_array();
 
     int eq = element_array_equals(expect, actual);
@@ -273,7 +235,7 @@ static void verify_stack_pop_exec_array(const char *input, int expect_len, const
 }
 
 
-#define NEW_ELEMENT_ARRAY(a) new_element_array(sizeof(a) / sizeof(Element), a)
+#define NEW_ELEMENT_ARRAY(a) new_element_array_from_fixed_array(sizeof(a) / sizeof(Element), a)
 
 #define ASSERT_POP_EXEC_ARRAY(a) assert_pop_exec_array(sizeof(a) / sizeof(Element), a)
 
@@ -460,7 +422,7 @@ void eval_test_all() {
 
 #if 1
 int main() {
-    
+
     parser_test_all();
     stack_test_all();
     dict_test_all();
@@ -468,6 +430,8 @@ int main() {
     element_test_all();
     element_array_test_all();
     auto_element_array_test_all();
+
+    operator_test_all();
 
     eval_test_all();
 

@@ -62,6 +62,10 @@ void stack_push_number(int i) {
     stack_push(&el);
 }
 
+void stack_push_exec_array(ElementArray *ea) {
+    Element el = {ELEMENT_EXEC_ARRAY, .u.exec_array = ea};
+    stack_push(&el);
+}
 
 void stack_push(const Element *el) {
     assert(sp < STACK_SIZE);
@@ -105,8 +109,8 @@ static void test_try_stack_pop() {
 }
 
 static void test_stack_push_pop() {
-    Element input = {0};
-    Element expect = {0};
+    Element input = {ELEMENT_NUMBER, {0}};
+    Element expect = {ELEMENT_NUMBER, {0}};
 
     stack_push(&input);
 
@@ -134,20 +138,6 @@ void stack_test_all() {
     test_try_stack_pop();
     test_stack_push_pop();
     test_stack_push_push_pop_pop();
-
-    Element el = {ELEMENT_NUMBER, .u.number = 123};
-    stack_push(&el);
-
-    el = (Element){ELEMENT_NUMBER, .u.number = 45};
-    stack_push(&el);
-
-    el = (Element){ELEMENT_LITERAL_NAME, .u.name = "some"};
-    stack_push(&el);
-
-    el = (Element){ELEMENT_LITERAL_NAME, .u.name = "some2"};
-    stack_push(&el);
-
-    stack_print_all();
 }
 
 #if 0

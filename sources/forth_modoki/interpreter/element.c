@@ -56,6 +56,47 @@ void element_print_with_indent(int indent, const Element *el) {
 }
 
 
+static void assert_element_equals(const Element *expect_true, const Element *expect_false, const Element *input);
+#define NEW_ELEMENT_ARRAY(a) new_element_array_from_fixed_array(sizeof(a) / sizeof(Element), a)
+
+
+static void test_element_equals_name() {
+    Element input = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
+    Element expect_true = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
+    Element expect_false = {ELEMENT_EXECUTABLE_NAME, .u.name = "abc"};
+
+    assert_element_equals(&expect_true, &expect_false, &input);
+}
+
+static void test_element_equals_number() {
+    Element input = {ELEMENT_NUMBER, .u.number = 1};
+    Element expect_true = {ELEMENT_NUMBER, .u.number = 1};
+    Element expect_false = {ELEMENT_NUMBER, .u.number = 2};
+
+    assert_element_equals(&expect_true, &expect_false, &input);
+}
+
+static void test_element_equals_exec_array() {
+    Element input_array[] = {{ELEMENT_NUMBER, .u.number = 1}, {ELEMENT_NUMBER, .u.number = 2}};
+    Element input = {ELEMENT_EXEC_ARRAY, .u.exec_array = NEW_ELEMENT_ARRAY(input_array)};
+
+    Element expect_true_array[] = {{ELEMENT_NUMBER, .u.number = 1}, {ELEMENT_NUMBER, .u.number = 2}};
+    Element expect_true = {ELEMENT_EXEC_ARRAY, .u.exec_array = NEW_ELEMENT_ARRAY(expect_true_array)};
+
+    Element expect_false_array[] = {{ELEMENT_NUMBER, .u.number = 1}, {ELEMENT_NUMBER, .u.number = 3}};
+    Element expect_false = {ELEMENT_EXEC_ARRAY, .u.exec_array = NEW_ELEMENT_ARRAY(expect_false_array)};
+
+    assert_element_equals(&expect_true, &expect_false, &input);
+}
+
+
+void element_test_all() {
+    test_element_equals_name();
+    test_element_equals_number();
+    test_element_equals_exec_array();
+
+}
+
 
 static void assert_element_equals(const Element *expect_true, const Element *expect_false, const Element *input) {
     int actual;
@@ -73,53 +114,3 @@ static void assert_element_equals(const Element *expect_true, const Element *exp
     assert(!actual);
 }
 
-
-
-static void test_element_equals_name() {
-    Element input = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
-    Element expect_true = {ELEMENT_LITERAL_NAME, .u.name = "abc"};
-    Element expect_false = {ELEMENT_EXECUTABLE_NAME, .u.name = "abc"};
-
-    assert_element_equals(&expect_true, &expect_false, &input);
-}
-
-
-static void test_element_equals_number() {
-    Element input = {ELEMENT_NUMBER, .u.number = 1};
-    Element expect_true = {ELEMENT_NUMBER, .u.number = 1};
-    Element expect_false = {ELEMENT_NUMBER, .u.number = 2};
-
-    assert_element_equals(&expect_true, &expect_false, &input);
-}
-
-
-#define NEW_ELEMENT_ARRAY(a) new_element_array_from_fixed_array(sizeof(a) / sizeof(Element), a)
-static void test_element_equals_exec_array() {
-    Element input_array[] = {{ELEMENT_NUMBER, .u.number = 1}, {ELEMENT_NUMBER, .u.number = 2}};
-    Element input = {ELEMENT_EXEC_ARRAY, .u.exec_array = NEW_ELEMENT_ARRAY(input_array)};
-
-    Element expect_true_array[] = {{ELEMENT_NUMBER, .u.number = 1}, {ELEMENT_NUMBER, .u.number = 2}};
-    Element expect_true = {ELEMENT_EXEC_ARRAY, .u.exec_array = NEW_ELEMENT_ARRAY(expect_true_array)};
-
-    Element expect_false_array[] = {{ELEMENT_NUMBER, .u.number = 1}, {ELEMENT_NUMBER, .u.number = 3}};
-    Element expect_false = {ELEMENT_EXEC_ARRAY, .u.exec_array = NEW_ELEMENT_ARRAY(expect_false_array)};
-
-    assert_element_equals(&expect_true, &expect_false, &input);
-}
-
-
-
-void element_test_all() {
-    test_element_equals_name();
-    test_element_equals_number();
-    test_element_equals_exec_array();
-
-}
-
-#if 0
-int main() {
-    test_all();
-
-    return 0;
-}
-#endif

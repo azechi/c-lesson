@@ -6,7 +6,6 @@
 #include "auto_element_array.h"
 
 
-
 void auto_element_array_init(AutoElementArray *out) {
     out->var_array = new_element_array(out->size);
 }
@@ -36,7 +35,47 @@ void auto_element_array_print(const AutoElementArray *aea) {
     element_array_print(aea->var_array);
 }
 
-static void verify_auto_element_array_init(int input) {
+
+/* Unit test */
+static void verify_init(int input);
+static void verify_size_increase(int input_count, int expect_size);
+static void verify_add_element(int input_len, Element input_elements[]);
+#define VERIFY_ADD_ELEMENT(a) verify_add_element(sizeof(a) / sizeof(Element), a)
+
+
+static void test_init() {
+    verify_init(0);
+    verify_init(1);
+}
+
+static void test_size_increase() {
+    /* below is expecting values that depend on an increase algorithm */
+    verify_size_increase(0, 0);
+    verify_size_increase(1, 2);
+    verify_size_increase(3, 6);
+    verify_size_increase(7, 14);
+    verify_size_increase(15, 30);
+}
+
+static void test_add_element() {
+    Element input[] = {
+        {ELEMENT_NUMBER, .u.number = 1},
+        {ELEMENT_NUMBER, .u.number = 2},
+        {ELEMENT_NUMBER, .u.number = 3}
+    };
+
+    VERIFY_ADD_ELEMENT(input);
+}
+
+
+void auto_element_array_test_all() {
+    test_init();
+    test_size_increase();
+    test_add_element();
+}
+
+
+static void verify_init(int input) {
     AutoElementArray aea = {input};
     auto_element_array_init(&aea);
 
@@ -44,12 +83,7 @@ static void verify_auto_element_array_init(int input) {
     assert(0 == aea.var_array->len);
 }
 
-static void test_auto_element_array_init() {
-    verify_auto_element_array_init(0);
-    verify_auto_element_array_init(1);
-}
-
-static void verify_auto_element_array_increase(int input_count, int expect_size) {
+static void verify_size_increase(int input_count, int expect_size) {
     AutoElementArray aea = {0};
     auto_element_array_init(&aea);
 
@@ -63,16 +97,7 @@ static void verify_auto_element_array_increase(int input_count, int expect_size)
     assert(expect_size == aea.size);
 }
 
-static void test_auto_element_array_increase() {
-    /* below is expecting values that depend on an increase algorithm */
-    verify_auto_element_array_increase(0, 0);
-    verify_auto_element_array_increase(1, 2);
-    verify_auto_element_array_increase(3, 6);
-    verify_auto_element_array_increase(7, 14);
-    verify_auto_element_array_increase(15, 30);
-}
-
-static void verify_auto_element_array_add_element(int input_len, Element input_elements[]) {
+static void verify_add_element(int input_len, Element input_elements[]) {
     ElementArray *expect = new_element_array(input_len);
     memcpy(expect->elements, input_elements, sizeof(Element) * input_len);
     expect->len = input_len;
@@ -87,26 +112,5 @@ static void verify_auto_element_array_add_element(int input_len, Element input_e
 
     int eq = element_array_equals(expect, aea.var_array);
     assert(eq);
-}
-
-#define VERIFY_AUTO_ELEMENT_ARRAY_ADD_ELEMENT(a) verify_auto_element_array_add_element(sizeof(a) / sizeof(Element), a)
-
-static void test_auto_element_array_add_element() {
-    Element input[] = {
-        {ELEMENT_NUMBER, .u.number = 1},
-        {ELEMENT_NUMBER, .u.number = 2},
-        {ELEMENT_NUMBER, .u.number = 3}
-    };
-
-    VERIFY_AUTO_ELEMENT_ARRAY_ADD_ELEMENT(input);
-}
-
-#undef NEW_ELEMENT_ARRAY
-
-void auto_element_array_test_all() {
-
-    test_auto_element_array_init();
-    test_auto_element_array_increase();
-    test_auto_element_array_add_element();
 }
 

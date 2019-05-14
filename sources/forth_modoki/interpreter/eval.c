@@ -23,13 +23,11 @@ void eval_exec_array(const ElementArray *ea) {
         switch(el->etype) {
             case ELEMENT_NUMBER:
             case ELEMENT_LITERAL_NAME:
+            case ELEMENT_EXEC_ARRAY:
                 stack_push(el);
                 break;
             case ELEMENT_C_FUNC:
                 el->u.cfunc();
-                break;
-            case ELEMENT_EXEC_ARRAY:
-                eval_exec_array(el->u.exec_array);
                 break;
             case ELEMENT_EXECUTABLE_NAME:
                 eval_executable_name(el->u.name);
@@ -89,7 +87,7 @@ static Element to_element(const Token *token) {
 static Element compile_exec_array(int ch, int *out_ch) {
     AutoElementArray elements = {0};
     Token token = {0};
-    
+
     auto_element_array_init(&elements);
 
     do {
@@ -163,8 +161,7 @@ void eval() {
     } while(ch != EOF);
 }
 
-static void env_init(const char *input) {
-    cl_getc_set_src(input);
+static void env_init() {
     stack_clear();
     dict_clear();
     register_primitive();
@@ -172,7 +169,8 @@ static void env_init(const char *input) {
 
 
 void call_eval(const char *input) {
-    env_init(input);
+    env_init();
+    cl_getc_set_src(input);
     eval();
 }
 
@@ -373,24 +371,54 @@ static void test_eval_executable_array() {
     verify_stack_pop_number("/ZZ {6} def ZZ", 6);
 }
 
-static void test_eval_executable_array_nested_nested() {
-    char *input = "/ZZ {6} def" \
-                   "/YY {4 ZZ 5} def" \
-                   "/XX {1 2 YY 3} def" \
-                   " XX";
-    Element expect[] = {
-        {ELEMENT_NUMBER, .u.number = 3},
-        {ELEMENT_NUMBER, .u.number = 5},
-        {ELEMENT_NUMBER, .u.number = 6},
-        {ELEMENT_NUMBER, .u.number = 4},
-        {ELEMENT_NUMBER, .u.number = 2},
-        {ELEMENT_NUMBER, .u.number = 1}
-    };
+
+static void verify_eval(const char *input, const char *expect_input) {
+
+    AutoElementArray actual = {0};
+    auto_element_array_init(&actual);
+
+    Element *el;
 
     call_eval(input);
-    ASSSERT_STACK(expect);
+    while ((el = try_stack_pop())) {
+        auto_element_array_add_element(&actual, el);
+    }
+
+    AutoElementArray expect = {0};
+    auto_element_array_init(&expect);
+
+    call_eval(expect_input);
+    while ((el = try_stack_pop())) {
+        auto_element_array_add_element(&expect, el);
+    }
+
+    int eq = element_array_equals(expect.var_array, actual.var_array);
+    assert(eq);
 }
 
+static void test_eval_executable_array_nested_nested() {
+    char *input = "/ZZ {6} def " \
+                   "/YY {4 ZZ 5} def " \
+                   "/XX {1 2 YY 3} def " \
+                   " XX";
+    verify_eval(input, "1 2 4 6 5 3");
+}
+
+static void test_while() {
+    verify_eval("3 {dup 1 sub dup 1 ge} {9 exch} while", "3 9 2 9 1 0");
+    verify_eval("5  { dup 10 lt } { 3 add } while", "11");
+    verify_eval("4 dup {dup 1 gt} {1 sub exch 1 index mul exch} while pop", "24");
+    verify_eval("1 { 2 add dup 4 lt } { 10 add } while", "15");
+
+    verify_eval("{ 3 {dup 1 sub dup 1 ge} {9 exch} while} exec", "3 9 2 9 1 0");
+
+    verify_eval("1 dup {dup 1 gt} exec", "1 1 0");
+    verify_eval("3 3{1 sub exch 1 index mul exch} exec", "6 2");
+    verify_eval("3 dup {dup 1 gt} exec", "3 3 1");
+    verify_eval("/f{ dup {dup 1 gt} { 1 sub exch 1 index mul exch} while pop } def 1 f", "1");
+
+
+}
 
 void eval_test_all() {
 
@@ -418,24 +446,40 @@ void eval_test_all() {
 
     test_eval_executable_array();
     test_eval_executable_array_nested_nested();
+
+    test_while();
+
+    verify_stack_pop_number("1 2 3 add add 4 5 6 7 8 9 add add add add add add", 45);
 }
 
 #if 1
-int main() {
+int main(int argc, char *argv[]) {
 
-    parser_test_all();
-    stack_test_all();
-    dict_test_all();
+    if(argc <= 1) {
+        parser_test_all();
+        stack_test_all();
+        dict_test_all();
+        element_test_all();
+        element_array_test_all();
+        auto_element_array_test_all();
+        operator_test_all();
+        eval_test_all();
+        return 0;
+    }
 
-    element_test_all();
-    element_array_test_all();
-    auto_element_array_test_all();
+    FILE *f = NULL;
+    f = fopen(argv[1], "r");
+    if(!f) {
+        printf("ERROR! FILE CANNOT OPEN: [%s]", argv[1]);
+        return 1;
+    }
 
-    operator_test_all();
+    cl_getc_set_file(f);
+    env_init();
+    eval();
 
-    eval_test_all();
+    stack_print_all();
 
-    verify_stack_pop_number("1 2 3 add add 4 5 6 7 8 9 add add add add add add", 45);
 
     return 0;
 }

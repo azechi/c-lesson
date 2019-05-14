@@ -59,18 +59,18 @@ static int token_equals(const Token *t1, const Token *t2) {
     }
 }
 
-static void verify_parse_one(const char *input, const Token *expect, int expect_prev_ch) {
+static void verify_parse_one(const char *input, const Token *expect, int expect_ch) {
     cl_getc_set_src(input);
 
     Token actual = {0};
-    int actual_prev_ch = parse_one(EOF, &actual);
+    int actual_ch = parse_one(EOF, &actual);
     int eq = token_equals(expect, &actual);
-    assert(eq && actual_prev_ch);
+    assert(eq && expect_ch ==  actual_ch);
 }
 
-static void verify_parse_one_number(const char *input, int expect_number, int expect_prev_ch) {
+static void verify_parse_one_number(const char *input, int expect_number, int expect_ch) {
     Token expect = {LEX_NUMBER, .u.number = expect_number};
-    verify_parse_one(input, &expect, expect_prev_ch);
+    verify_parse_one(input, &expect, expect_ch);
 }
 
 static void test_parse_one_number() {
@@ -95,14 +95,14 @@ static int parse_one_number(int prev_ch, int ch, Token *out_token) {
 }
 
 
-static void verify_parse_one_executable_name(const char *input, const char *expect_name, int expect_prev_ch) {
+static void verify_parse_one_executable_name(const char *input, const char *expect_name, int expect_ch) {
     Token expect = {LEX_EXECUTABLE_NAME, .u.name = (char*)expect_name};
-    verify_parse_one(input, &expect, expect_prev_ch);
+    verify_parse_one(input, &expect, expect_ch);
 }
 
-static void verify_parse_one_literal_name(const char *input, const char *expect_name, int expect_prev_ch) {
+static void verify_parse_one_literal_name(const char *input, const char *expect_name, int expect_ch) {
     Token expect = {LEX_LITERAL_NAME, .u.name = (char*)expect_name};
-    verify_parse_one(input, &expect, expect_prev_ch);
+    verify_parse_one(input, &expect, expect_ch);
 }
 
 static void test_parse_one_executable_name() {
@@ -144,9 +144,9 @@ static int parse_one_name(int prev_ch, int ch, Token *out_token) {
 }
 
 
-static void verify_parse_one_space(const char *input, int expect_prev_ch) {
+static void verify_parse_one_space(const char *input, int expect_ch) {
     Token expect = {LEX_SPACE, .u.onechar = ' '};
-    verify_parse_one(input, &expect, expect_prev_ch);
+    verify_parse_one(input, &expect, expect_ch);
 }
 
 static void test_parse_one_space() {
@@ -187,9 +187,11 @@ int parse_one(int prev_ch, Token *out_token) {
     {
         ch = parse_one_name(prev_ch, ch, out_token);
     } else if (prev_ch == '%') {
-        while (ch == '\n') {
+        while (ch != '\n' && ch != EOF) {
             ch = cl_getc();
         }
+
+        ch = cl_getc();
         out_token->ltype = LEX_SPACE;
         out_token->u.onechar = ' ';
     }  else if (prev_ch == ' '

@@ -37,6 +37,11 @@ static void div_op() {
     stack_push_number(res);
 }
 
+static void mod_op() {
+    int op2 = stack_pop_number();
+    int res = stack_pop_number() % op2;
+    stack_push_number(res);
+}
 
 static void eq_op() {
     int res = stack_pop_number() == stack_pop_number();
@@ -283,6 +288,7 @@ void register_primitive() {
     dict_put_c_func("sub", sub_op);
     dict_put_c_func("mul", mul_op);
     dict_put_c_func("div", div_op);
+    dict_put_c_func("mod", mod_op);
 
     dict_put_c_func("eq", eq_op);
     dict_put_c_func("neq", neq_op);

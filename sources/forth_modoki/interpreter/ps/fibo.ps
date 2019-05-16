@@ -1,0 +1,32 @@
+/fibo {
+
+    dup 0 eq {pop 0} {      % ifelse
+
+        1 0            % n(>= 1) 1(F1) 0(F0)
+        3 -1 roll       % F1 F0 n
+
+        {dup 1 gt} {    % while
+            1 sub       % F1 F0 n-1
+            3 1 roll    % n-1 F1 F0
+
+            1 index add % n-1 F1 (F0 + F1)=F2
+            exch        % n-1 F2 F1
+
+            3 -1 roll   % F2 F1 n-1
+        } while
+        pop pop
+    } ifelse
+} def
+
+0 fibo
+1 fibo
+2 fibo
+3 fibo
+4 fibo
+5 fibo
+6 fibo
+7 fibo
+8 fibo
+9 fibo
+10 fibo
+20 fibo

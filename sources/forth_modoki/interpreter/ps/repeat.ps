@@ -1,0 +1,14 @@
+/repeat {
+    /body exch def
+    /repeat_count exch def
+
+    {repeat_count 0 gt}
+    {
+        repeat_count 1 sub
+        /repeat_count exch def
+        body
+    } while
+} def
+
+3 {1 2} repeat
+

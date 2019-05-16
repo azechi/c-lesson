@@ -130,7 +130,7 @@ static int parse_one_name(int prev_ch, int ch, Token *out_token) {
         ch = cl_getc();
     }
 
-    while (is_alpha_digit(ch)) {
+    while (is_alpha_digit(ch) || ch == '_') {
         buf[i++] = ch;
         ch = cl_getc();
     }

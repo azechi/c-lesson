@@ -1,0 +1,15 @@
+/sum_k2 {
+    0 exch          % acm i
+    {dup 1 ge}
+    {
+        dup         % acm i i
+        dup mul     % acm i i^2
+        3 -1 roll   % i i^2 acm
+        add         % i acm
+        exch        % acm i
+        1 sub       % acm i-1
+    } while
+    pop
+} def
+
+100 sum_k2 % 338350

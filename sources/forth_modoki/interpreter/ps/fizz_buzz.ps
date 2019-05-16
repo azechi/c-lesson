@@ -1,0 +1,22 @@
+/fizzbuzz {
+    1   % n i
+    {
+        1 index 1 index ge      % n >= i
+    } {     %while
+
+        dup 15 mod 0 eq {/FIZZBUZZ} {    %ifelse
+        dup  5 mod 0 eq {/BUZZ} {        %ifelse
+        dup  3 mod 0 eq {/FIZZ} {        %ifelse
+            dup
+        } ifelse } ifelse } ifelse
+
+        3 1 roll    % j n i
+        1 add       % j n i+1
+
+    } while
+    pop
+    pop
+} def
+
+
+15 fizzbuzz

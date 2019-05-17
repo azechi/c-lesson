@@ -121,32 +121,6 @@ static void exec_exec_array(Continuation *co) {
                             co_stack_push_exec_array(exec_array);
                         }
                         return;
-                    } else if(streq("ifelse", el->u.name)) {
-                        ElementArray *exec_false = stack_pop_exec_array();
-                        ElementArray *exec_true = stack_pop_exec_array();
-                        int is_true = stack_pop_number();
-
-                        stack_push_number(is_true);
-                        stack_push_number(5);
-                        stack_push_executable_name("jmp_not_if");
-                        stack_push_exec_array(exec_true);
-                        stack_push_executable_name("exec");
-                        stack_push_number(3);
-                        stack_push_executable_name("jmp");
-                        stack_push_exec_array(exec_false);
-                        stack_push_executable_name("exec");
-
-                        ElementArray *proc = new_element_array(9);
-                        proc->len = 9;
-                        int j = 9;
-                        for(; j--;) {
-                            proc->elements[j] = *stack_pop();
-                        }
-
-                        co->pc = ++i;
-                        co_stack_push(co);
-                        co_stack_push_exec_array(proc);
-                        return;
                     }
 
                     Element el2 = {0};
@@ -187,6 +161,32 @@ void eval_exec_array(const ElementArray *exec_array) {
 }
 
 
+static void emit_number(AutoElementArray *emitter, int number) {
+    Element el = {ELEMENT_NUMBER, .u.number = number};
+    auto_element_array_add_element(emitter, &el);
+}
+
+static void emit_executable_name(AutoElementArray *emitter, char *name) {
+    Element el = {ELEMENT_EXECUTABLE_NAME, .u.name = name};
+    auto_element_array_add_element(emitter, &el);
+}
+
+static void ifelse_compile(AutoElementArray *emitter) {
+    emit_number(emitter, 3);
+    emit_number(emitter, 2);
+    emit_executable_name(emitter, "roll");
+    emit_number(emitter, 5);
+    emit_executable_name(emitter, "jmp_not_if");
+    emit_executable_name(emitter, "pop");
+    emit_executable_name(emitter, "exec");
+    emit_number(emitter, 4);
+    emit_executable_name(emitter, "jmp");
+    emit_executable_name(emitter, "exch");
+    emit_executable_name(emitter, "pop");
+    emit_executable_name(emitter, "exec");
+}
+
+
 static Element compile_exec_array(int ch, int *out_ch) {
     AutoElementArray elements = {0};
     Token token = {0};
@@ -196,8 +196,13 @@ static Element compile_exec_array(int ch, int *out_ch) {
     do {
         ch = parse_one(ch, &token);
         switch(token.ltype) {
-            case LEX_NUMBER:
             case LEX_EXECUTABLE_NAME:
+                if(streq("ifelse", token.u.name)) {
+                    ifelse_compile(&elements);
+                    break;
+                }
+                /* fallthrough  */
+            case LEX_NUMBER:
             case LEX_LITERAL_NAME:
                 {
                     Element el = to_element(&token);

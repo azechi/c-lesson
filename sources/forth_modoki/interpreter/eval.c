@@ -6,18 +6,76 @@
 #include "element.h"
 #include "auto_element_array.h"
 #include "operator.h"
+#include "continuation.h"
 
-
-
-static void eval_executable_name(const char *name);
+static Element compile_exec_array(int ch, int *out_ch);
+static Element to_element(const Token *token);
 void eval_exec_array(const ElementArray *ea);
 
 
-void eval_exec_array(const ElementArray *ea) {
-    int i;
+void eval() {
+    int ch = EOF;
+    Token token = {0};
+
+    do {
+        ch = parse_one(ch, &token);
+        if(token.ltype != LEX_UNKNOWN) {
+            switch(token.ltype) {
+                case LEX_NUMBER:
+                case LEX_LITERAL_NAME:
+                    {
+                        Element el = to_element(&token);
+                        stack_push(&el);
+                    }
+                    break;
+                case LEX_EXECUTABLE_NAME:
+                    {
+                        Element el = {0};
+                        if(!dict_get(token.u.name, &el)) {
+                            assert_fail("EXECUTABLE NAME NOT FOUND");
+                            return;
+                        }
+
+                        switch(el.etype) {
+                            case ELEMENT_C_FUNC:
+                                el.u.cfunc();
+                                break;
+                            case ELEMENT_EXEC_ARRAY:
+                                eval_exec_array(el.u.exec_array);
+                                break;
+                            default:
+                                stack_push(&el);
+                                break;
+                        }
+                    }
+                    break;
+                case LEX_OPEN_CURLY:
+                    {
+                        Element el = compile_exec_array(ch, &ch);
+                        stack_push(&el);
+                    }
+                    break;
+                case LEX_CLOSE_CURLY:
+                    assert_fail("SYNTAX ERROR");
+                    break;
+                case LEX_SPACE:
+                case LEX_END_OF_FILE:
+                    break;
+                default:
+                    assert_fail("NOT IMPLEMENTED");
+                    break;
+            }
+        }
+    } while(ch != EOF);
+}
+
+
+static void exec_exec_array(Continuation *co) {
+    int i = co->pc;
+    const ElementArray *ea = co->exec_array;
     int len = ea->len;
 
-    for(i = 0; i < len; i++) {
+    for(; i < len; i++) {
         const Element *el = &ea->elements[i];
 
         switch(el->etype) {
@@ -26,11 +84,54 @@ void eval_exec_array(const ElementArray *ea) {
             case ELEMENT_EXEC_ARRAY:
                 stack_push(el);
                 break;
-            case ELEMENT_C_FUNC:
-                el->u.cfunc();
-                break;
             case ELEMENT_EXECUTABLE_NAME:
-                eval_executable_name(el->u.name);
+                {
+                    if(streq("exec", el->u.name)) {
+                        ElementArray *exec_array = stack_pop_exec_array();
+
+                        co->pc = ++i;
+                        co_stack_push(co);
+                        co_stack_push_exec_array(exec_array);
+                        return;
+                    } else if(streq("if", el->u.name)) {
+                        ElementArray *exec_array = stack_pop_exec_array();
+                        int is_true = stack_pop_number();
+                        if(is_true) {
+                            co->pc = ++i;
+                            co_stack_push(co);
+                            co_stack_push_exec_array(exec_array);
+                        }
+                        return;
+                    } else if(streq("ifelse", el->u.name)) {
+                        ElementArray *exec_false = stack_pop_exec_array();
+                        ElementArray *exec_true = stack_pop_exec_array();
+                        int is_true = stack_pop_number();
+                        co->pc = ++i;
+                        co_stack_push(co);
+                        co_stack_push_exec_array(is_true? exec_true: exec_false);
+                        return;
+                    }
+
+                    Element el2 = {0};
+                    if(!dict_get(el->u.name, &el2)) {
+                        assert_fail("EXECUTABLE NAME NOT FOUND");
+                        return;
+                    }
+
+                    switch(el2.etype) {
+                        case ELEMENT_C_FUNC:
+                            el2.u.cfunc();
+                            break;
+                        case ELEMENT_EXEC_ARRAY:
+                            co->pc = ++i;
+                            co_stack_push(co);
+                            co_stack_push_exec_array(el2.u.exec_array);
+                            return;
+                        default:
+                            stack_push(&el2);
+                            break;
+                    }
+                }
                 break;
             default:
                 assert_fail("NOT IMPLEMENTED");
@@ -39,48 +140,13 @@ void eval_exec_array(const ElementArray *ea) {
     }
 }
 
-static void eval_executable_name(const char *name) {
-    Element el = {0};
-    if(!dict_get(name, &el)) {
-        assert_fail("EXECUTABLE NAME NOT FOUND");
-        return;
+void eval_exec_array(const ElementArray *exec_array) {
+    co_stack_push_exec_array(exec_array);
+
+    Continuation *co;
+    while((co = try_co_stack_pop())) {
+        exec_exec_array(co);
     }
-
-    switch(el.etype) {
-        case ELEMENT_C_FUNC:
-            el.u.cfunc();
-            break;
-        case ELEMENT_EXEC_ARRAY:
-            eval_exec_array(el.u.exec_array);
-            break;
-        default:
-            stack_push(&el);
-            break;
-    }
-}
-
-static Element to_element(const Token *token) {
-    Element el = {0};
-
-    switch(token->ltype) {
-        case LEX_NUMBER:
-            el.etype = ELEMENT_NUMBER;
-            el.u.number = token->u.number;
-            break;
-        case LEX_EXECUTABLE_NAME:
-            el.etype = ELEMENT_EXECUTABLE_NAME;
-            el.u.name = token->u.name;
-            break;
-        case LEX_LITERAL_NAME:
-            el.etype = ELEMENT_LITERAL_NAME;
-            el.u.name = token->u.name;
-            break;
-        default:
-            assert_fail("CAN'T CONVERT");
-            break;
-    }
-
-    return el;
 }
 
 
@@ -123,43 +189,30 @@ static Element compile_exec_array(int ch, int *out_ch) {
     return (Element){ELEMENT_EXEC_ARRAY, .u.exec_array = elements.var_array};
 }
 
-void eval() {
-    int ch = EOF;
-    Token token = {0};
+static Element to_element(const Token *token) {
+    Element el = {0};
 
-    do {
-        ch = parse_one(ch, &token);
-        if(token.ltype != LEX_UNKNOWN) {
-            switch(token.ltype) {
-                case LEX_NUMBER:
-                case LEX_LITERAL_NAME:
-                    {
-                        Element el = to_element(&token);
-                        stack_push(&el);
-                    }
-                    break;
-                case LEX_EXECUTABLE_NAME:
-                    eval_executable_name(token.u.name);
-                    break;
-                case LEX_OPEN_CURLY:
-                    {
-                        Element el = compile_exec_array(ch, &ch);
-                        stack_push(&el);
-                    }
-                    break;
-                case LEX_CLOSE_CURLY:
-                    assert_fail("SYNTAX ERROR");
-                    break;
-                case LEX_SPACE:
-                case LEX_END_OF_FILE:
-                    break;
-                default:
-                    assert_fail("NOT IMPLEMENTED");
-                    break;
-            }
-        }
-    } while(ch != EOF);
+    switch(token->ltype) {
+        case LEX_NUMBER:
+            el.etype = ELEMENT_NUMBER;
+            el.u.number = token->u.number;
+            break;
+        case LEX_EXECUTABLE_NAME:
+            el.etype = ELEMENT_EXECUTABLE_NAME;
+            el.u.name = token->u.name;
+            break;
+        case LEX_LITERAL_NAME:
+            el.etype = ELEMENT_LITERAL_NAME;
+            el.u.name = token->u.name;
+            break;
+        default:
+            assert_fail("CAN'T CONVERT");
+            break;
+    }
+
+    return el;
 }
+
 
 static void env_init() {
     stack_clear();
@@ -416,8 +469,6 @@ static void test_while() {
     verify_eval("3 3{1 sub exch 1 index mul exch} exec", "6 2");
     verify_eval("3 dup {dup 1 gt} exec", "3 3 1");
     verify_eval("/f{ dup {dup 1 gt} { 1 sub exch 1 index mul exch} while pop } def 1 f", "1");
-
-
 }
 
 void eval_test_all() {
@@ -450,6 +501,15 @@ void eval_test_all() {
     test_while();
 
     verify_stack_pop_number("1 2 3 add add 4 5 6 7 8 9 add add add add add add", 45);
+
+
+    verify_eval("1 {2} {3} ifelse 4", "2 4");
+    verify_eval("/a { {345} ifelse} def 1 {123} a", "123");
+    verify_eval("/f {{1 3 add} exec 3} def f", "4 3");
+
+    verify_eval("{1 {2} {3} ifelse} exec 4", "2 4");
+
+    verify_eval("/a {{0} {1} ifelse} def /b {{1 a} {0 a}ifelse} def /c {1 b} def c", "0");
 }
 
 #if 1
@@ -464,6 +524,7 @@ int main(int argc, char *argv[]) {
         auto_element_array_test_all();
         operator_test_all();
         eval_test_all();
+        co_stack_test_all();
         return 0;
     }
 

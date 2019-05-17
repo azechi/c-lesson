@@ -70,6 +70,7 @@ void eval() {
 }
 
 
+
 static void exec_exec_array(Continuation *co) {
     int i = co->pc;
     const ElementArray *ea = co->exec_array;
@@ -86,7 +87,25 @@ static void exec_exec_array(Continuation *co) {
                 break;
             case ELEMENT_EXECUTABLE_NAME:
                 {
-                    if(streq("exec", el->u.name)) {
+                    if(streq("jmp", el->u.name)) {
+                        int n = stack_pop_number();
+                        i += n;
+                        if(i < 0){
+                            i = 0;
+                        }
+                        i--;
+                        break;
+                    }else if(streq("jmp_not_if", el->u.name)) {
+                        int n = stack_pop_number();
+                        if(!stack_pop_number()) {
+                            i += n;
+                            if(i < 0){
+                                i = 0;
+                            }
+                            i--;
+                        }
+                        break;
+                    }else if(streq("exec", el->u.name)) {
                         ElementArray *exec_array = stack_pop_exec_array();
 
                         co->pc = ++i;
@@ -106,9 +125,27 @@ static void exec_exec_array(Continuation *co) {
                         ElementArray *exec_false = stack_pop_exec_array();
                         ElementArray *exec_true = stack_pop_exec_array();
                         int is_true = stack_pop_number();
+
+                        stack_push_number(is_true);
+                        stack_push_number(5);
+                        stack_push_executable_name("jmp_not_if");
+                        stack_push_exec_array(exec_true);
+                        stack_push_executable_name("exec");
+                        stack_push_number(3);
+                        stack_push_executable_name("jmp");
+                        stack_push_exec_array(exec_false);
+                        stack_push_executable_name("exec");
+
+                        ElementArray *proc = new_element_array(9);
+                        proc->len = 9;
+                        int j = 9;
+                        for(; j--;) {
+                            proc->elements[j] = *stack_pop();
+                        }
+
                         co->pc = ++i;
                         co_stack_push(co);
-                        co_stack_push_exec_array(is_true? exec_true: exec_false);
+                        co_stack_push_exec_array(proc);
                         return;
                     }
 
@@ -471,6 +508,24 @@ static void test_while() {
     verify_eval("/f{ dup {dup 1 gt} { 1 sub exch 1 index mul exch} while pop } def 1 f", "1");
 }
 
+static void test_eval_exec_array() {
+    verify_eval("/a {0} def /b {{a 1} exec 2} def {b 3} exec", "0 1 2 3");
+    verify_eval("/a {1} def /b {0 a {1}if 2} def {b 3} exec", "0 1 2 3");
+    verify_eval("/a {0} def /b {0 a {4}{1}ifelse 2} def {b 3} exec", "0 1 2 3");
+}
+
+static void test_eval_exec_array_jmp() {
+    verify_eval("{1 jmp 1 2 3 4 5} exec 10", "1 2 3 4 5 10");
+    verify_eval("{3 jmp 1 2 3 4 5} exec 10", "3 4 5 10");
+    verify_eval("{10 jmp 1 2 3 4 5} exec 10", "10");
+    verify_eval("2 {jmp 123 5 -10 jmp 9} exec 10", "9 10");
+    verify_eval("2 {jmp 123 5 -4 jmp 9} exec 10", "9 10");
+}
+
+static void test_eval_exec_array_jmp_not_if() {
+
+}
+
 void eval_test_all() {
 
     test_eval_empty();
@@ -510,6 +565,10 @@ void eval_test_all() {
     verify_eval("{1 {2} {3} ifelse} exec 4", "2 4");
 
     verify_eval("/a {{0} {1} ifelse} def /b {{1 a} {0 a}ifelse} def /c {1 b} def c", "0");
+
+    test_eval_exec_array();
+    test_eval_exec_array_jmp();
+    test_eval_exec_array_jmp_not_if();
 }
 
 #if 1

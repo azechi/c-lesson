@@ -67,6 +67,11 @@ void stack_push_exec_array(ElementArray *ea) {
     stack_push(&el);
 }
 
+void stack_push_executable_name(char *name) {
+    Element el = {ELEMENT_EXECUTABLE_NAME, .u.name = name};
+    stack_push(&el);
+}
+
 void stack_push(const Element *el) {
     assert(sp < STACK_SIZE);
 
@@ -81,7 +86,7 @@ void stack_clear() {
 }
 
 
-void stack_print_all() { 
+void stack_print_all() {
     int i = sp;
     while(i > 0) {
         element_print(&stack[--i]);

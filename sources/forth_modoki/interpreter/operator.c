@@ -231,7 +231,6 @@ static void exec_op() {
 }
 
 static void test_exec() {
-    verify_op("/a {111 222 333} def /b {11 {a} exec 22 } def {1 b 2}", exec_op, "1 11 111 222 333 22 2");
 }
 
 

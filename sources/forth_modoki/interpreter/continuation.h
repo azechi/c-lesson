@@ -3,17 +3,39 @@
 
 #include "element.h"
 
+
+typedef enum CallStackItemType_ {
+    CALLSTACKITEM_VARIABLE,
+    CALLSTACKITEM_CONTINUATION
+} CallStackItemType;
+
+
 typedef struct Continuation_ {
     const ElementArray *exec_array;
     int pc; /* program counter  */
 } Continuation;
 
 
-Continuation *try_co_stack_pop();
+typedef struct CallStackItem_ {
+    enum CallStackItemType_ ctype;
+    union {
+        struct Continuation_ continuation;
+        Element variable;
+    } u;
+} CallStackItem;
 
-void co_stack_push(const Continuation *co);
+CallStackItem  *try_co_stack_peek();
 
-void co_stack_push_exec_array(const ElementArray *ea);
+CallStackItem  *try_co_stack_pop();
+
+
+void co_stack_push(const CallStackItem *item);
+
+void co_stack_push_continuation(const Continuation *co);
+
+void co_stack_push_exec_array(const ElementArray *exec_array);
+
+void co_stack_push_variable(const Element *el);
 
 void co_stack_clear();
 void co_stack_print_all();

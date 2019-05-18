@@ -96,6 +96,14 @@ static void jmp_not_if_compile(AutoElementArray *emitter) {
     emit_primitive(emitter, OP_JMP_NOT_IF);
 }
 
+static void store_compile(AutoElementArray *emitter) {
+    emit_primitive(emitter, OP_STORE);
+}
+
+static void load_compile(AutoElementArray *emitter) {
+    emit_primitive(emitter, OP_LOAD);
+}
+
 
 void register_primitive() {
     compile_dict_put_compile_func("ifelse", ifelse_compile);
@@ -103,6 +111,8 @@ void register_primitive() {
     compile_dict_put_compile_func("exec", exec_compile);
     compile_dict_put_compile_func("jmp", jmp_compile);
     compile_dict_put_compile_func("jmp_not_if", jmp_not_if_compile);
+    compile_dict_put_compile_func("store", store_compile);
+    compile_dict_put_compile_func("load", load_compile);
 }
 
 

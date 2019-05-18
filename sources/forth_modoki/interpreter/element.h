@@ -23,7 +23,9 @@ typedef enum ElementType_ {
 typedef enum Operator_ {
     OP_EXEC,
     OP_JMP,
-    OP_JMP_NOT_IF
+    OP_JMP_NOT_IF,
+    OP_STORE,
+    OP_LOAD
 } Operator;
 
 

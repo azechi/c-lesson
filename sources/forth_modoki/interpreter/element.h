@@ -25,7 +25,8 @@ typedef enum Operator_ {
     OP_JMP,
     OP_JMP_NOT_IF,
     OP_STORE,
-    OP_LOAD
+    OP_LOAD,
+    OP_LPOP
 } Operator;
 
 

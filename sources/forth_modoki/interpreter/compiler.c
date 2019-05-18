@@ -60,17 +60,14 @@ Element compile_exec_array(int ch, int *out_ch) {
 
 
 static void ifelse_compile(AutoElementArray *emitter) {
-    emit_number(emitter, 3);
-    emit_number(emitter, 2);
-    emit_executable_name(emitter, "roll");
-    emit_number(emitter, 5);
-    emit_primitive(emitter, OP_JMP_NOT_IF);
-    emit_executable_name(emitter, "pop");
-    emit_primitive(emitter, OP_EXEC);
-    emit_number(emitter, 4);
-    emit_primitive(emitter, OP_JMP);
     emit_executable_name(emitter, "exch");
-    emit_executable_name(emitter, "pop");
+    emit_primitive(emitter, OP_STORE);
+    emit_primitive(emitter, OP_STORE);
+/*  */
+    emit_number(emitter, 1);
+    emit_executable_name(emitter, "ge");
+/* */
+    emit_primitive(emitter, OP_LOAD);
     emit_primitive(emitter, OP_EXEC);
 }
 
@@ -99,6 +96,33 @@ static void while_compile(AutoElementArray *emitter) {
     emit_primitive(emitter, OP_JMP);
 }
 
+static void repeat_compile(AutoElementArray *emitter) {
+    emit_primitive(emitter, OP_STORE);
+    emit_primitive(emitter, OP_STORE);
+    emit_number(emitter, 0);
+    emit_primitive(emitter, OP_LOAD);
+    /* */
+    emit_number(emitter, 1);
+    emit_executable_name(emitter, "ge");
+    /* */
+    emit_number(emitter, 11);
+    emit_primitive(emitter, OP_JMP_NOT_IF);
+    emit_number(emitter, 1);
+    emit_primitive(emitter, OP_LOAD);
+    emit_primitive(emitter, OP_EXEC);
+    emit_number(emitter, 0);
+    emit_primitive(emitter, OP_LOAD);
+    emit_number(emitter, 1);
+    emit_executable_name(emitter, "sub");
+    emit_primitive(emitter, OP_LPOP);
+    emit_number(emitter, -16);
+    emit_primitive(emitter, OP_JMP);
+}
+
+static void lpop_compile(AutoElementArray *emitter) {
+    emit_primitive(emitter, OP_LPOP);
+}
+
 static void exec_compile(AutoElementArray *emitter) {
     emit_primitive(emitter, OP_EXEC);
 }
@@ -124,6 +148,9 @@ void register_primitive() {
     compile_dict_put_compile_func("ifelse", ifelse_compile);
     compile_dict_put_compile_func("if", if_compile);
     compile_dict_put_compile_func("while", while_compile);
+    compile_dict_put_compile_func("repeat", repeat_compile);
+
+    compile_dict_put_compile_func("lpop", lpop_compile);
     compile_dict_put_compile_func("exec", exec_compile);
     compile_dict_put_compile_func("jmp", jmp_compile);
     compile_dict_put_compile_func("jmp_not_if", jmp_not_if_compile);

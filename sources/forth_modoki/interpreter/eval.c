@@ -106,6 +106,14 @@ static void exec_exec_array(Continuation co) {
                 break;
             case ELEMENT_PRIMITIVE:
                 switch(el->u.operator) {
+                    case OP_LPOP:
+                        {
+                            CallStackItem *item = try_co_stack_pop();
+                            if(!item || item->ctype != CALLSTACKITEM_VARIABLE) {
+                                assert_fail("VARIABLE NOT FOUND");
+                            }
+                        }
+                        break;
                     case OP_STORE:
                         {
                             Element *el2 = stack_pop();
@@ -500,6 +508,7 @@ static void test_eval_exec_array_jmp() {
 
 static void test_eval_exec_array_primitive() {
     verify_eval("{1 store 2 store 1 load 0 load 1 load 0 load add } exec 4", "1 2 3 4");
+    verify_eval("/a {1} def {a {a} repeat 2 {2} repeat 3} exec 4", "1 2 2 3 4");
 }
 
 void eval_test_all() {

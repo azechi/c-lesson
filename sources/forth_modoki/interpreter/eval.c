@@ -69,8 +69,8 @@ void eval() {
     } while(ch != EOF);
 }
 
-void call_exact_array(Continuation *co, int pc, ElementArray *exec_array) {
-    co->pc = pc + 1;
+void call_exact_array(Continuation *co, ElementArray *exec_array) {
+    co->pc++;
     co_stack_push_continuation(co);
     co_stack_push_exec_array(exec_array);
 }
@@ -92,13 +92,11 @@ Element *co_stack_get_variable(int offset) {
     return tmp;
 }
 
-static void exec_exec_array(Continuation *co) {
-    int i = co->pc;
-    const ElementArray *ea = co->exec_array;
-    int len = ea->len;
+static void exec_exec_array(Continuation co) {
+    const ElementArray *ea = co.exec_array;
 
-    for(; i < len; i++) {
-        const Element *el = &ea->elements[i];
+    for(; co.pc < ea->len; co.pc++) {
+        const Element *el = &ea->elements[co.pc];
 
         switch(el->etype) {
             case ELEMENT_NUMBER:
@@ -124,22 +122,22 @@ static void exec_exec_array(Continuation *co) {
                     case OP_JMP:
                         {
                             int n = stack_pop_number();
-                            i += n;
-                            if(i < 0) {
-                                i = 0;
+                            co.pc += n;
+                            if(co.pc < 0) {
+                                co.pc = 0;
                             }
-                            i--;
+                            co.pc--;
                         }
                         break;
                     case OP_JMP_NOT_IF:
                         {
                             int n = stack_pop_number();
                             if(!stack_pop_number()) {
-                                i += n;
-                                if(i < 0){
-                                    i = 0;
+                                co.pc += n;
+                                if(co.pc < 0){
+                                    co.pc = 0;
                                 }
-                                i--;
+                                co.pc--;
                             }
                         }
                         break;
@@ -147,7 +145,7 @@ static void exec_exec_array(Continuation *co) {
                         {
                             ElementArray *exec_array = stack_pop_exec_array();
 
-                            call_exact_array(co, i, exec_array);
+                            call_exact_array(&co, exec_array);
                             return;
                         }
                 }
@@ -165,7 +163,7 @@ static void exec_exec_array(Continuation *co) {
                             el2.u.c_func();
                             break;
                         case ELEMENT_EXEC_ARRAY:
-                            call_exact_array(co, i, el2.u.exec_array);
+                            call_exact_array(&co, el2.u.exec_array);
                             return;
                         default:
                             stack_push(&el2);
@@ -195,7 +193,7 @@ void eval_exec_array(const ElementArray *exec_array) {
 
     Continuation *co;
     while((co = try_co_stack_pop_continuation())) {
-        exec_exec_array(co);
+        exec_exec_array(*co);
     }
 }
 
@@ -505,6 +503,8 @@ static void test_eval_exec_array_primitive() {
 }
 
 void eval_test_all() {
+
+    verify_eval("{1 0 1 1 {}{} while 2 } exec 3", "1 2 3");
 
     test_eval_empty();
     test_eval_num_one();

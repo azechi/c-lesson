@@ -84,6 +84,21 @@ static void if_compile(AutoElementArray *emitter) {
     emit_executable_name(emitter, "pop");
 }
 
+static void while_compile(AutoElementArray *emitter) {
+    emit_primitive(emitter, OP_STORE);
+    emit_primitive(emitter, OP_STORE);
+    emit_number(emitter, 0);
+    emit_primitive(emitter, OP_LOAD);
+    emit_primitive(emitter, OP_EXEC);
+    emit_number(emitter, 6);
+    emit_primitive(emitter, OP_JMP_NOT_IF);
+    emit_number(emitter, 1);
+    emit_primitive(emitter, OP_LOAD);
+    emit_primitive(emitter, OP_EXEC);
+    emit_number(emitter, -9);
+    emit_primitive(emitter, OP_JMP);
+}
+
 static void exec_compile(AutoElementArray *emitter) {
     emit_primitive(emitter, OP_EXEC);
 }
@@ -108,6 +123,7 @@ static void load_compile(AutoElementArray *emitter) {
 void register_primitive() {
     compile_dict_put_compile_func("ifelse", ifelse_compile);
     compile_dict_put_compile_func("if", if_compile);
+    compile_dict_put_compile_func("while", while_compile);
     compile_dict_put_compile_func("exec", exec_compile);
     compile_dict_put_compile_func("jmp", jmp_compile);
     compile_dict_put_compile_func("jmp_not_if", jmp_not_if_compile);

@@ -3,7 +3,7 @@
 #include "dict.h"
 #include "auto_element_array.h"
 #include "eval.h"
-#include "operator.h"
+#include "c_operator.h"
 
 
 static void verify_op(const char *input_src, void(*op)(), const char *expect_src);
@@ -280,7 +280,7 @@ static void test_while() {
 }
 
 
-void register_primitive() {
+void register_c_operator() {
     dict_put_c_func("def", def_op);
 
     dict_put_c_func("add", add_op);

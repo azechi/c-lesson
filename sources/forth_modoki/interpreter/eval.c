@@ -5,10 +5,10 @@
 #include "dict.h"
 #include "element.h"
 #include "auto_element_array.h"
-#include "operator.h"
+#include "c_operator.h"
+#include "compiler.h"
 #include "continuation.h"
 
-static Element compile_exec_array(int ch, int *out_ch);
 static Element to_element(const Token *token);
 void eval_exec_array(const ElementArray *ea);
 
@@ -38,7 +38,7 @@ void eval() {
 
                         switch(el.etype) {
                             case ELEMENT_C_FUNC:
-                                el.u.cfunc();
+                                el.u.c_func();
                                 break;
                             case ELEMENT_EXEC_ARRAY:
                                 eval_exec_array(el.u.exec_array);
@@ -85,44 +85,43 @@ static void exec_exec_array(Continuation *co) {
             case ELEMENT_EXEC_ARRAY:
                 stack_push(el);
                 break;
-            case ELEMENT_EXECUTABLE_NAME:
-                {
-                    if(streq("jmp", el->u.name)) {
-                        int n = stack_pop_number();
-                        i += n;
-                        if(i < 0){
-                            i = 0;
-                        }
-                        i--;
-                        break;
-                    }else if(streq("jmp_not_if", el->u.name)) {
-                        int n = stack_pop_number();
-                        if(!stack_pop_number()) {
+            case ELEMENT_PRIMITIVE:
+                switch(el->u.operator) {
+                    case OP_JMP:
+                        {
+                            int n = stack_pop_number();
                             i += n;
-                            if(i < 0){
+                            if(i < 0) {
                                 i = 0;
                             }
                             i--;
                         }
                         break;
-                    }else if(streq("exec", el->u.name)) {
-                        ElementArray *exec_array = stack_pop_exec_array();
+                    case OP_JMP_NOT_IF:
+                        {
+                            int n = stack_pop_number();
+                            if(!stack_pop_number()) {
+                                i += n;
+                                if(i < 0){
+                                    i = 0;
+                                }
+                                i--;
+                            }
+                        }
+                        break;
+                    case OP_EXEC:
+                        {
+                            ElementArray *exec_array = stack_pop_exec_array();
 
-                        co->pc = ++i;
-                        co_stack_push(co);
-                        co_stack_push_exec_array(exec_array);
-                        return;
-                    } else if(streq("if", el->u.name)) {
-                        ElementArray *exec_array = stack_pop_exec_array();
-                        int is_true = stack_pop_number();
-                        if(is_true) {
                             co->pc = ++i;
                             co_stack_push(co);
                             co_stack_push_exec_array(exec_array);
+                            return;
                         }
-                        return;
-                    }
-
+                }
+                break;
+            case ELEMENT_EXECUTABLE_NAME:
+                {
                     Element el2 = {0};
                     if(!dict_get(el->u.name, &el2)) {
                         assert_fail("EXECUTABLE NAME NOT FOUND");
@@ -131,7 +130,7 @@ static void exec_exec_array(Continuation *co) {
 
                     switch(el2.etype) {
                         case ELEMENT_C_FUNC:
-                            el2.u.cfunc();
+                            el2.u.c_func();
                             break;
                         case ELEMENT_EXEC_ARRAY:
                             co->pc = ++i;
@@ -161,75 +160,6 @@ void eval_exec_array(const ElementArray *exec_array) {
 }
 
 
-static void emit_number(AutoElementArray *emitter, int number) {
-    Element el = {ELEMENT_NUMBER, .u.number = number};
-    auto_element_array_add_element(emitter, &el);
-}
-
-static void emit_executable_name(AutoElementArray *emitter, char *name) {
-    Element el = {ELEMENT_EXECUTABLE_NAME, .u.name = name};
-    auto_element_array_add_element(emitter, &el);
-}
-
-static void ifelse_compile(AutoElementArray *emitter) {
-    emit_number(emitter, 3);
-    emit_number(emitter, 2);
-    emit_executable_name(emitter, "roll");
-    emit_number(emitter, 5);
-    emit_executable_name(emitter, "jmp_not_if");
-    emit_executable_name(emitter, "pop");
-    emit_executable_name(emitter, "exec");
-    emit_number(emitter, 4);
-    emit_executable_name(emitter, "jmp");
-    emit_executable_name(emitter, "exch");
-    emit_executable_name(emitter, "pop");
-    emit_executable_name(emitter, "exec");
-}
-
-
-static Element compile_exec_array(int ch, int *out_ch) {
-    AutoElementArray elements = {0};
-    Token token = {0};
-
-    auto_element_array_init(&elements);
-
-    do {
-        ch = parse_one(ch, &token);
-        switch(token.ltype) {
-            case LEX_EXECUTABLE_NAME:
-                if(streq("ifelse", token.u.name)) {
-                    ifelse_compile(&elements);
-                    break;
-                }
-                /* fallthrough  */
-            case LEX_NUMBER:
-            case LEX_LITERAL_NAME:
-                {
-                    Element el = to_element(&token);
-                    auto_element_array_add_element(&elements, &el);
-                }
-                break;
-            case LEX_CLOSE_CURLY:
-            case LEX_SPACE:
-                break;
-            case LEX_OPEN_CURLY:
-                {
-                    Element el = compile_exec_array(ch, &ch);
-                    auto_element_array_add_element(&elements, &el);
-                }
-                break;
-            case LEX_END_OF_FILE:
-            default:
-                assert_fail("NOT IMPLEMENTED");
-                break;
-        }
-    } while(token.ltype != LEX_CLOSE_CURLY);
-
-    *out_ch = ch;
-
-    auto_element_array_trim_to_size(&elements);
-    return (Element){ELEMENT_EXEC_ARRAY, .u.exec_array = elements.var_array};
-}
 
 static Element to_element(const Token *token) {
     Element el = {0};
@@ -258,8 +188,11 @@ static Element to_element(const Token *token) {
 
 static void env_init() {
     stack_clear();
+    co_stack_clear();
     dict_clear();
+    compile_dict_clear();
     register_primitive();
+    register_c_operator();
 }
 
 

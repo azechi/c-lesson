@@ -10,7 +10,70 @@ typedef struct Node_ {
     Element value;
     struct Node_ *next;
 } Node;
-static Node *array[TABLE_SIZE];
+
+static Node *eval_dict[TABLE_SIZE];
+static Node *compile_dict[TABLE_SIZE];
+
+
+static int hash(const char *str);
+static Node *new_node(const char *key, const Element *value);
+static void update_or_insert_list(Node **head, const char *key, const Element *value);
+static int dict_get_common(Node *table[], const char *key, Element *out_el);
+static void dict_put_common(Node *table[], const char *key, const Element *el);
+static void dict_clear_common(Node *table[]);
+
+
+void dict_put(const char* key, const Element *el) {
+    return dict_put_common(eval_dict, key, el);
+}
+
+
+void compile_dict_put(const char* key, const Element *el) {
+    return dict_put_common(compile_dict, key, el);
+}
+
+
+void dict_put_c_func(const char *key, void(*c_func)()) {
+    Element el = {ELEMENT_C_FUNC, .u.c_func = c_func};
+    dict_put(key, &el);
+}
+
+void compile_dict_put_compile_func(const char *key, CompileFunc func) {
+    Element el = {ELEMENT_COMPILE_FUNC, .u.compile_func = func};
+    compile_dict_put(key, &el);
+}
+
+
+int dict_get(const char* key, Element *out_el) {
+    return dict_get_common(eval_dict, key, out_el);
+}
+
+int compile_dict_get(const char* key, Element *out_el) {
+    return dict_get_common(compile_dict, key, out_el);
+}
+
+
+void dict_print_all() {
+    int i = TABLE_SIZE;
+    while(i--) {
+        Node *head = eval_dict[i];
+        while(head) {
+            printf("KEY: %s", head->key);
+            element_print(&head->value);
+            head = head->next;
+        }
+    }
+}
+
+
+void dict_clear() {
+    dict_clear_common(eval_dict);
+}
+
+void compile_dict_clear() {
+    dict_clear_common(compile_dict);
+}
+
 
 static int hash(const char *str) {
     unsigned int val = 0;
@@ -42,19 +105,15 @@ static void update_or_insert_list(Node **head, const char *key, const Element *v
 }
 
 
-void dict_put(const char* key, const Element *el) {
+static void dict_put_common(Node *table[], const char *key, const Element *el) {
     int h = hash(key);
-    update_or_insert_list(&array[h], key, el);
+    update_or_insert_list(&table[h], key, el);
 }
 
-void dict_put_c_func(const char *name, void(*c_func)()) {
-    Element el = {ELEMENT_C_FUNC, .u.cfunc = c_func};
-    dict_put(name, &el);
-}
 
-int dict_get(const char* key, Element *out_el) {
+static int dict_get_common(Node *table[], const char *key, Element *out_el) {
     int h = hash(key);
-    Node *head = array[h];
+    Node *head = table[h];
 
     while(head) {
         if(streq(key,  head->key)) {
@@ -67,31 +126,19 @@ int dict_get(const char* key, Element *out_el) {
     return 0;
 }
 
-void dict_print_all() {
-    int i = TABLE_SIZE;
-    while(i--) {
-        Node *head = array[i];
-        while(head) {
-            printf("KEY: %s", head->key);
-            element_print(&head->value);
-            head = head->next;
-        }
-    }
-}
 
-void dict_clear() {
+static void dict_clear_common(Node *table[]) {
     int i = TABLE_SIZE;
     while(i--){
-        Node *node = array[i];
+        Node *node = table[i];
         while(node) {
             Node *tmp = node->next;
             free(node);
             node = tmp;
         }
-        array[i] = NULL;
+        table[i] = NULL;
     }
 }
-
 
 /* unit tests */
 
@@ -184,11 +231,3 @@ void dict_test_all() {
     test_dict_overwrite();
 }
 
-#if 0
-int main() {
-
-    test_all();
-
-    return 0;
-}
-#endif

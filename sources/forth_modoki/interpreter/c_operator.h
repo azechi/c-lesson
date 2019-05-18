@@ -2,8 +2,7 @@
 #define OPERATOR_H
 
 
-void register_primitive();
-
+void register_c_operator();
 
 void operator_test_all();
 

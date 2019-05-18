@@ -43,7 +43,7 @@ void element_print_with_indent(int indent, const Element *el) {
             printf("literal name %s\n", el->u.name);
             break;
         case ELEMENT_C_FUNC:
-            printf("c func %p\n", el->u.cfunc);
+            printf("c func %p\n", el->u.c_func);
             break;
         case ELEMENT_EXEC_ARRAY:
             printf("exec array  len %d\n", el->u.exec_array->len);

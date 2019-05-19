@@ -1,6 +1,7 @@
+
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include "def.h"
 #include "util.h"
 #include "element.h"
 

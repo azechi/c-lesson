@@ -1,4 +1,6 @@
+#include <stddef.h>
 #include <assert.h>
+#include "util.h"
 #include "stack.h"
 #include "dict.h"
 #include "auto_element_array.h"
@@ -10,9 +12,11 @@ static void verify_op(const char *input_src, void(*op)(), const char *expect_src
 
 
 static void def_op() {
-    Element *val = stack_pop();
+    Element val = {0};
+    stack_pop_element(&val);
+
     char *name = stack_pop_literal_name();
-    dict_put(name, val);
+    dict_put(name, &val);
 }
 
 static void add_op() {
@@ -130,8 +134,11 @@ static void test_pop() {
 
 
 static void exch_op() {
-    Element op2 = *stack_pop();
-    Element op1 = *stack_pop();
+    Element op2 = {0};
+    stack_pop_element(&op2);
+    Element op1 = {0};
+    stack_pop_element(&op1);
+
     stack_push(&op2);
     stack_push(&op1);
 }
@@ -142,7 +149,9 @@ static void test_exch() {
 
 
 static void dup_op() {
-    Element op = *stack_pop();
+    Element op = {0};
+    stack_pop_element(&op);
+    
     stack_push(&op);
     stack_push(&op);
 }
@@ -157,12 +166,14 @@ static void index_op() {
     AutoElementArray buf = {0};
     auto_element_array_init(&buf);
 
+    Element el = {0};
     while(n--) {
-        Element *el = stack_pop();
-        auto_element_array_add_element(&buf, el);
+        
+        stack_pop_element(&el);
+        auto_element_array_add_element(&buf, &el);
     }
 
-    Element el = *stack_pop();
+    stack_pop_element(&el);
     stack_push(&el);
 
     ElementArray *arr = buf.var_array;
@@ -187,17 +198,18 @@ static void roll_op() {
     AutoElementArray buf = {0};
     auto_element_array_init(&buf);
 
+    Element el = {0};
     int i = n;
     while(i--) {
-        Element *el = stack_pop();
-        auto_element_array_add_element(&buf, el);
+        stack_pop_element(&el);
+        auto_element_array_add_element(&buf, &el);
     }
 
     i = n;
     while(i--) {
         int k = (((i + j) % n) + n) % n;
-        Element *el = &buf.var_array->elements[k];
-        stack_push(el);
+        el = buf.var_array->elements[k];
+        stack_push(&el);
     }
 }
 
@@ -227,7 +239,7 @@ static void test_roll() {
 
 static void exec_op() {
     ElementArray *ea = stack_pop_exec_array();
-    eval_exec_array(ea);
+    eval_exec_array(exec_exec_array, ea);
 }
 
 static void test_exec() {
@@ -239,7 +251,7 @@ static void if_op() {
     int is_true = stack_pop_number();
 
     if(is_true) {
-        eval_exec_array(ea);
+        eval_exec_array(exec_exec_array, ea);
     }
 }
 
@@ -254,7 +266,7 @@ static void ifelse_op() {
     ElementArray *proc_true = stack_pop_exec_array();
     int n = stack_pop_number();
 
-    eval_exec_array(n? proc_true: proc_false);
+    eval_exec_array(exec_exec_array, n? proc_true: proc_false);
 }
 
 static void test_ifelse() {
@@ -266,10 +278,10 @@ static void while_op() {
     ElementArray *body = stack_pop_exec_array();
     ElementArray *cond = stack_pop_exec_array();
 
-    eval_exec_array(cond);
+    eval_exec_array(exec_exec_array, cond);
     while (stack_pop_number()) {
-        eval_exec_array(body);
-        eval_exec_array(cond);
+        eval_exec_array(exec_exec_array, body);
+        eval_exec_array(exec_exec_array, cond);
     }
 }
 
@@ -338,9 +350,9 @@ static void verify_op(const char *input_src, void(*op)(), const char *expect_src
     AutoElementArray actual = {0};
     auto_element_array_init(&actual);
 
-    Element *el;
-    while ((el = try_stack_pop())) {
-       auto_element_array_add_element(&actual, el);
+    Element el;
+    while (try_stack_pop_element(&el)) {
+       auto_element_array_add_element(&actual, &el);
     }
 
     call_eval(expect_src);
@@ -348,8 +360,8 @@ static void verify_op(const char *input_src, void(*op)(), const char *expect_src
     AutoElementArray expect = {0};
     auto_element_array_init(&expect);
 
-    while((el = try_stack_pop())) {
-        auto_element_array_add_element(&expect, el);
+    while(try_stack_pop_element(&el)) {
+        auto_element_array_add_element(&expect, &el);
     }
 
     int eq = element_array_equals(expect.var_array, actual.var_array);

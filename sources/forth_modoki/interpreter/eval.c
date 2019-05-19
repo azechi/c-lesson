@@ -1,4 +1,4 @@
-#include <assert.h>
+#include "def.h"
 #include "util.h"
 #include "parser.h"
 #include "stack.h"
@@ -7,11 +7,12 @@
 #include "auto_element_array.h"
 #include "c_operator.h"
 #include "compiler.h"
-#include "continuation.h"
+
+#include "call_stack.h"
+#include "eval.h"
+
 
 static Element to_element(const Token *token);
-void eval_exec_array(const ElementArray *ea);
-
 
 void eval() {
     int ch = EOF;
@@ -41,7 +42,7 @@ void eval() {
                                 el.u.c_func();
                                 break;
                             case ELEMENT_EXEC_ARRAY:
-                                eval_exec_array(el.u.exec_array);
+                                eval_exec_array(exec_exec_array, el.u.exec_array);
                                 break;
                             default:
                                 stack_push(&el);
@@ -69,34 +70,11 @@ void eval() {
     } while(ch != EOF);
 }
 
-void call_exact_array(Continuation *co, ElementArray *exec_array) {
-    co->pc++;
-    co_stack_push_continuation(co);
-    co_stack_push_exec_array(exec_array);
-}
+void exec_exec_array(Continuation *co) {
+    const ElementArray *ea = co->exec_array;
 
-Element *co_stack_get_variable(int offset) {
-    CallStackItem *item;
-    item = try_co_stack_peek();
-    if(!item || item->ctype != CALLSTACKITEM_VARIABLE) {
-        assert_fail("VARIABLE NOT FOUND");
-    }
-
-    if(offset == 0) {
-        return &item->u.variable;
-    }
-
-    item = try_co_stack_pop();
-    Element *tmp = co_stack_get_variable(offset - 1);
-    co_stack_push(item);
-    return tmp;
-}
-
-static void exec_exec_array(Continuation co) {
-    const ElementArray *ea = co.exec_array;
-
-    for(; co.pc < ea->len; co.pc++) {
-        const Element *el = &ea->elements[co.pc];
+    for(; co->pc < ea->len; co->pc++) {
+        const Element *el = &ea->elements[co->pc];
 
         switch(el->etype) {
             case ELEMENT_NUMBER:
@@ -107,53 +85,49 @@ static void exec_exec_array(Continuation co) {
             case ELEMENT_PRIMITIVE:
                 switch(el->u.operator) {
                     case OP_LPOP:
-                        {
-                            CallStackItem *item = try_co_stack_pop();
-                            if(!item || item->ctype != CALLSTACKITEM_VARIABLE) {
-                                assert_fail("VARIABLE NOT FOUND");
-                            }
-                        }
+                        local_variable_pop();
                         break;
                     case OP_STORE:
                         {
-                            Element *el2 = stack_pop();
-                            co_stack_push_variable(el2);
+                            Element el2 = {0};
+                            stack_pop_element(&el2);
+                            local_variable_push(&el2);
                         }
                         break;
                     case OP_LOAD:
                         {
                             int offset = stack_pop_number();
-                            Element *el2 = co_stack_get_variable(offset);
-                            stack_push(el2);
+                            Element el2 = {0};
+                            local_variable_get(offset, &el2);
+                            stack_push(&el2);
                         }
                         break;
                     case OP_JMP:
                         {
                             int n = stack_pop_number();
-                            co.pc += n;
-                            if(co.pc < 0) {
-                                co.pc = 0;
+                            co->pc += n;
+                            if(co->pc < 0) {
+                                co->pc = 0;
                             }
-                            co.pc--;
+                            co->pc--;
                         }
                         break;
                     case OP_JMP_NOT_IF:
                         {
                             int n = stack_pop_number();
                             if(!stack_pop_number()) {
-                                co.pc += n;
-                                if(co.pc < 0){
-                                    co.pc = 0;
+                                co->pc += n;
+                                if(co->pc < 0){
+                                    co->pc = 0;
                                 }
-                                co.pc--;
+                                co->pc--;
                             }
                         }
                         break;
                     case OP_EXEC:
                         {
                             ElementArray *exec_array = stack_pop_exec_array();
-
-                            call_exact_array(&co, exec_array);
+                            call_exec_array(exec_array, co);
                             return;
                         }
                 }
@@ -171,7 +145,7 @@ static void exec_exec_array(Continuation co) {
                             el2.u.c_func();
                             break;
                         case ELEMENT_EXEC_ARRAY:
-                            call_exact_array(&co, el2.u.exec_array);
+                            call_exec_array(el2.u.exec_array, co);
                             return;
                         default:
                             stack_push(&el2);
@@ -185,26 +159,6 @@ static void exec_exec_array(Continuation co) {
         }
     }
 }
-
-static Continuation *try_co_stack_pop_continuation() {
-    CallStackItem *item;
-    while((item = try_co_stack_pop())) {
-        if(item->ctype == CALLSTACKITEM_CONTINUATION) {
-            return &item->u.continuation;
-        }
-    }
-    return NULL;
-}
-
-void eval_exec_array(const ElementArray *exec_array) {
-    co_stack_push_exec_array(exec_array);
-
-    Continuation *co;
-    while((co = try_co_stack_pop_continuation())) {
-        exec_exec_array(*co);
-    }
-}
-
 
 
 static Element to_element(const Token *token) {
@@ -234,7 +188,6 @@ static Element to_element(const Token *token) {
 
 static void env_init() {
     stack_clear();
-    co_stack_clear();
     dict_clear();
     compile_dict_clear();
     register_primitive();
@@ -262,16 +215,16 @@ static void assert_dict_contains_number(const char *expect_key, int expect_numbe
 }
 
 static void assert_stack(int expect_length, const Element expect_elements[]){
-    const Element *el;
+    Element el = {0};
     int i;
     for(i = 0; i < expect_length; i++) {
-        el = stack_pop();
-        int eq = element_equals(&expect_elements[i], el);
+        stack_pop_element(&el);
+        int eq = element_equals(&expect_elements[i], &el);
         assert(eq);
     }
 
-    el = try_stack_pop();
-    assert(el == NULL);
+    int empty = !try_stack_peek(NULL);
+    assert(empty);
 }
 
 static void assert_stack_pop_number(int expect) {
@@ -451,19 +404,19 @@ static void verify_eval(const char *input, const char *expect_input) {
     AutoElementArray actual = {0};
     auto_element_array_init(&actual);
 
-    Element *el;
+    Element el = {0};
 
     call_eval(input);
-    while ((el = try_stack_pop())) {
-        auto_element_array_add_element(&actual, el);
+    while (try_stack_pop_element(&el)) {
+        auto_element_array_add_element(&actual, &el);
     }
 
     AutoElementArray expect = {0};
     auto_element_array_init(&expect);
 
     call_eval(expect_input);
-    while ((el = try_stack_pop())) {
-        auto_element_array_add_element(&expect, el);
+    while (try_stack_pop_element(&el)) {
+        auto_element_array_add_element(&expect, &el);
     }
 
     int eq = element_array_equals(expect.var_array, actual.var_array);
@@ -570,7 +523,6 @@ int main(int argc, char *argv[]) {
         auto_element_array_test_all();
         operator_test_all();
         eval_test_all();
-        co_stack_test_all();
         return 0;
     }
 
@@ -585,7 +537,7 @@ int main(int argc, char *argv[]) {
     env_init();
     eval();
 
-    stack_print_all();
+    stack_print();
 
 
     return 0;

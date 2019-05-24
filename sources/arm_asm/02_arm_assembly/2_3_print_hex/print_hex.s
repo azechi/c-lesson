@@ -6,9 +6,27 @@
 */
 .globl _start
 _start:
-    ldr r1,=0xdeadbeaf
+    ldr r0, =0x101f1000
+    ldr r1, =0xdeadbeaf
+    mov r2, #32 // loop counter
     b print_hex
-print_hex:
-    // TODO: implement here
+
+print_hex:    
+    sub r2, r2, #4
+    
+    lsr r3, r1, r2
+    and r3, r3, #0xf
+    
+    ldr r4, =message
+    add r4, r4, r3
+    ldrb r4, [r4]
+    str r4, [r0]
+
+    cmp r2, #0
+    bne print_hex
+
 end:
     b end
+
+message:
+    .asciz "0123456789abcdef"

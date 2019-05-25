@@ -1,10 +1,19 @@
 .globl _start
 _start:
-  ldr r13, =0x08000000  
-  ldr r0, =0xdeadbeaf  
-  bl print_hex
+  ldr r13, =0x08000000  //10000
+  ldr r0, =0xdeadbeaf   //10004
+  bl print_hex          //10008
+  mov r0, r15           //1000c r15=0x00010014
+  bl print_hex          //10010
+  bl r14                //10014 r14=0x00010018
+  
 end:
-  b end
+  b end                 //10018
+
+r14:
+  mov r0, r14
+  bl print_hex
+  mov r15, r14
 
 /*
   putchar:
@@ -24,7 +33,7 @@ putchar:
     used internal register: r1, r2
 */
 print_hex:
-  stmdb r13!, {r14}
+  stmdb r13!, {r1, r2, r14}
   mov r1, r0
   mov r0, #0x30 // '0'
   bl putchar
@@ -43,6 +52,8 @@ _digit:
   bl putchar
   cmp r2, #0
   bne _loop
-  ldmia r13!, {r14}
+  mov r0, #0x0a // LF
+  bl putchar
+  ldmia r13!, {r1, r2, r14}
   mov r15, r14
 

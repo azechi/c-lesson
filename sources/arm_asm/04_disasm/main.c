@@ -1,11 +1,13 @@
+#include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include "cl_utils.h"
 
 static void assert_str_eq(const char *expect, const char *actual);
-static void verify_print_asm_unknown(const int input);
-static void verify_print_asm(const int input, const char *expect);
+static void verify_print_asm_unknown(uint32_t input);
+static void verify_print_asm(uint32_t input, const char *expect);
 
 
 static int print_asm(int word) {
@@ -15,7 +17,7 @@ static int print_asm(int word) {
         int rd = tmp >> 12;
         int op2 = tmp & 0x0FFF;
 
-        cl_printfn("mov r%i, #%#04x", rd, op2);
+        cl_printfn("mov r%i, #0x%02X", rd, op2);
         return 1;
     }
 
@@ -49,8 +51,8 @@ static void test_print_asm() {
     verify_print_asm_unknown(0x64646464);
 
     verify_print_asm(0xE3A01068, "mov r1, #0x68\n");
-    verify_print_asm(0xE3A0106C, "mov r1, #0x6c\n");
-    verify_print_asm(0xE3A0200A, "mov r2, #0x0a\n");
+    verify_print_asm(0xE3A0106C, "mov r1, #0x6C\n");
+    verify_print_asm(0xE3A0200A, "mov r2, #0x0A\n");
 
     verify_print_asm(0xEAFFFFFE, "b [r15, #-0x08]\n");
 
@@ -60,8 +62,35 @@ static void test_print_asm() {
     verify_print_asm(0xE5802000, "str r2, [r0]\n");
 }
 
-int main() {
-    test_print_asm();
+
+int main(int argc, char *argv[]) {
+
+    if(argc <= 1) {
+        test_print_asm();
+        return 0;
+    }
+
+    FILE *f = NULL;
+    f = fopen(argv[1], "rb");
+    if(!f) {
+        printf("ERROR! FILE CANNOT OPEN: [%s]", argv[1]);
+        return 1;
+    }
+
+    int count = 0x00010000;
+    uint32_t word;
+    int unknown = 0;
+    /* ファイルサイズが必ず4byteで割り切れるとする */
+    while(fread(&word, 4, 1, f)) {
+        cl_printf("0x%08X ", count);
+        if(unknown || (unknown = !print_asm(word))){
+            uint8_t *h = (uint8_t *)&word;
+            cl_printfn("%02X %02X %02X %02X", h[0], h[1], h[2], h[3]);
+        }
+
+        count += 4;
+    }
+
 }
 
 
@@ -70,7 +99,7 @@ static void assert_str_eq(const char *expect, const char *actual) {
     assert(eq);
 }
 
-static void verify_print_asm_unknown(const int input) {
+static void verify_print_asm_unknown(uint32_t input) {
     cl_enable_buffer_mode();
     cl_clear_output();
 
@@ -78,7 +107,7 @@ static void verify_print_asm_unknown(const int input) {
     assert(unknown);
 }
 
-static void verify_print_asm(const int input, const char *expect) {
+static void verify_print_asm(uint32_t input, const char *expect) {
     cl_enable_buffer_mode();
     cl_clear_output();
 

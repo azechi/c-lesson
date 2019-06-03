@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stdarg.h>
 
+#include "cl_utils.h"
 
 static char buf[100*1024];
 

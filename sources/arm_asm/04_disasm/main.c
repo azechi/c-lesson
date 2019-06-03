@@ -15,7 +15,12 @@ static int print_asm(int word) {
         int rd = tmp >> 12;
         int op2 = tmp & 0x0FFF;
         
-        cl_printf("mov r%i, #%#04x\n", rd, op2);
+        cl_printfn("mov r%i, #%#04x", rd, op2);
+        return 1;
+    }
+
+    if(0xEAFFFFFE == word) {
+        cl_printfn("b [r15, #-0x08]");
         return 1;
     }
 
@@ -24,9 +29,13 @@ static int print_asm(int word) {
 
 static void test_print_asm() {
     verify_print_asm_unknown(0x64646464);
+    
     verify_print_asm(0xE3A01068, "mov r1, #0x68\n");
     verify_print_asm(0xE3A0106C, "mov r1, #0x6c\n");
     verify_print_asm(0xE3A0200A, "mov r2, #0x0a\n");
+
+    verify_print_asm(0xEAFFFFFE, "b [r15, #-0x08]\n");
+
 }
 
 int main() {

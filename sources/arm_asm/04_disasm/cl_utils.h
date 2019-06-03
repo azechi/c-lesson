@@ -11,6 +11,7 @@ void cl_enable_buffer_mode();
 void cl_disable_buffer_mode();
 
 
+void cl_printfn(const char *fmt, ...);
 void cl_printf(char *fmt, ...);
 
 #endif

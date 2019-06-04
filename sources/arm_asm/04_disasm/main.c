@@ -10,7 +10,19 @@ static void verify_print_asm_unknown(uint32_t input);
 static void verify_print_asm(uint32_t input, const char *expect);
 
 
-static int print_asm(int word) {
+static int print_asm(uint32_t word) {
+    if(0xE2811001 == word) {
+        /* add */
+        cl_printfn("add r1, r1, #0x01");
+        return 1;
+    }
+
+    if(0xE3530000 == word) {
+        /* cmp */
+        cl_printfn("cmp r3, #0x00");
+        return 1;
+    }
+
     if(0xE3A00000 == (0xE3A00000 & word)) {
         /* move */
         int tmp = word & 0x0000FFFF;
@@ -21,13 +33,43 @@ static int print_asm(int word) {
         return 1;
     }
 
-    if(0xEAFFFFFE == word) {
-        cl_printfn("b [r15, #-0x08]");
-        return 1;
+    if(0x0A000000 == (0x0A000000 & word)) {
+        /* branch */
+        int offset = 0x00FFFFFF & word;
+
+        switch (word >> 28) {
+            case 0x1: /* bne */
+                if(offset != 0xFFFFFA) {
+                    return 0;
+                }
+                cl_printfn("bne [r15, #-0x18]");
+                return 1;
+            case 0xE: /* b (eq) */
+                if(offset != 0xFFFFFE) {
+                    return 0;
+                }
+                cl_printfn("b [r15, #-0x08]");
+                return 1;
+            default:
+                return 0;
+        }
     }
 
-    if(0xE59F0038 == word) {
-        cl_printfn("ldr r0, [r15, #0x38]");
+    if(0xE5900000 == (0xE5900000 & word)) {
+        /* ldr */
+        uint32_t tmp = word & 0x000FFFFF;
+        uint32_t rn = tmp >> 16;
+        uint32_t rd = (tmp & 0x0FFFF) >> 12;
+        uint32_t offset = tmp & 0xFFF;
+
+        uint32_t b = (word >> 20) & 0x004; /* byte/word */
+        char *op = b ? "ldrb": "ldr";
+
+        if(offset == 0){
+            cl_printfn("%s r%i, [r%i]", op, rd, rn);
+        }else {
+            cl_printfn("%s r%i, [r%i, #0x%02X]", op, rd, rn, offset);
+        }
         return 1;
     }
 
@@ -55,11 +97,22 @@ static void test_print_asm() {
     verify_print_asm(0xE3A0200A, "mov r2, #0x0A\n");
 
     verify_print_asm(0xEAFFFFFE, "b [r15, #-0x08]\n");
+    verify_print_asm(0x1AFFFFFA, "bne [r15, #-0x18]\n");
 
     verify_print_asm(0xE59F0038, "ldr r0, [r15, #0x38]\n");
+    verify_print_asm(0xE59F002C, "ldr r0, [r15, #0x2C]\n");
+    verify_print_asm(0xE59F102C, "ldr r1, [r15, #0x2C]\n");
+
+    verify_print_asm(0xE5D13000, "ldrb r3, [r1]\n");
 
     verify_print_asm(0xE5801000, "str r1, [r0]\n");
     verify_print_asm(0xE5802000, "str r2, [r0]\n");
+
+    verify_print_asm(0xE2811001, "add r1, r1, #0x01\n");
+
+    verify_print_asm(0xE3530000, "cmp r3, #0x00\n");
+
+
 }
 
 

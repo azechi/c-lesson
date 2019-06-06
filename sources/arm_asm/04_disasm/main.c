@@ -2,6 +2,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "cl_utils.h"
 
@@ -11,19 +12,22 @@ static void verify_print_asm(uint32_t input, const char *expect);
 
 
 static int print_asm(uint32_t word) {
-    if(0xE2811001 == word) {
-        /* add */
-        cl_printfn("add r1, r1, #0x01");
+    if(0xE2400000 == (0xFFF00000 & word)) {
+        /* sub */
+        int r_op1 = (word >> 16) & 0xF;
+        int r_dest = (word >> 12) & 0xF;
+
+        int rotate = (word >> 4) & 0xF;
+        if(rotate != 0) {
+            return 0;
+        }
+        int imm = word & 0xFF;
+        cl_printfn("sub r%i, r%i, #0x%02X", r_dest, r_op1, imm);
         return 1;
     }
 
-    if(0xE3530000 == word) {
-        /* cmp */
-        cl_printfn("cmp r3, #0x00");
-        return 1;
-    }
 
-    if(0xE3A00000 == (0xE3A00000 & word)) {
+    if(0xE3A00000 == (0xFFF00000 & word)) {
         /* move */
         int tmp = word & 0x0000FFFF;
         int rd = tmp >> 12;
@@ -33,29 +37,7 @@ static int print_asm(uint32_t word) {
         return 1;
     }
 
-    if(0x0A000000 == (0x0A000000 & word)) {
-        /* branch */
-        int offset = 0x00FFFFFF & word;
-
-        switch (word >> 28) {
-            case 0x1: /* bne */
-                if(offset != 0xFFFFFA) {
-                    return 0;
-                }
-                cl_printfn("bne [r15, #-0x18]");
-                return 1;
-            case 0xE: /* b (eq) */
-                if(offset != 0xFFFFFE) {
-                    return 0;
-                }
-                cl_printfn("b [r15, #-0x08]");
-                return 1;
-            default:
-                return 0;
-        }
-    }
-
-    if(0xE5900000 == (0xE5900000 & word)) {
+    if(0xE5900000 == (0xFF900000 & word)) {
         /* ldr */
         uint32_t tmp = word & 0x000FFFFF;
         uint32_t rn = tmp >> 16;
@@ -73,7 +55,7 @@ static int print_asm(uint32_t word) {
         return 1;
     }
 
-    if(0xE5800000 == (0xE5800000 & word)) {
+    if(0xE5800000 == (0xFF800000 & word)) {
         /* str */
         int tmp = word & 0x000FFFFF;
         int rn = tmp >> 16; /* base register */
@@ -86,7 +68,113 @@ static int print_asm(uint32_t word) {
         }
     }
 
-    return 0;
+    char cond = word >> 28 & 0xF;
+    int instruction = word >> 20 & 0x0FF; /* instruction is always positive */
+    int rest = word & 0x000FFFFF; /* rest is always positive */
+    switch (instruction >> 6) {
+        case 0:
+            /* 00 data processing, multiply, sigle data swap */
+            if(cond != 0xE && instruction & 0x1) {
+                /* set condition codes = 1 */
+                return 0;
+            }
+
+            char imm = instruction >> 5;
+            char opcode = instruction >> 1 & 0x0F;
+            char rn = rest >> 16;
+            char rd = rest >> 12 & 0x0F;
+            int operand2 = rest & 0x00FFF;
+            switch(opcode) {
+                case 0xD: /* 1101 MOV {MOV, LSR} */
+                    if(imm == 0) {
+                        /* LSR */
+                        if(!rn
+                                && (operand2 >> 4 & 0x09) != 0x1
+                                && (operand2 >> 5 & 0x01) != 0x1) {
+                            return 0;
+                        }
+                        char rm = operand2 & 0x00F;
+                        char rs = operand2 >> 8;
+                        cl_printfn("lsr r3, r1, r2", rd, rm, rs);
+                        return 1;
+                    }
+                case 0x0: /* 0000 AND */
+                    {
+                        if(!imm) {
+                            return 0;
+                        }
+                        char rotate = operand2 >> 8;
+                        int val = operand2 & 0x0FF;
+                        if(rotate) {
+                            return 0;
+                        }
+
+                        cl_printfn("and r%i, r%i, #0x%02X", rd, rn, val);
+                        return 1;
+                    }
+                case 0xA: /* 1010 CMP  */
+                    {
+                        if(!imm && !(instruction & 0x1)){
+                            return 0;
+                        }
+                        char rotate = operand2 >> 8;
+                        int val = operand2 & 0xFF;
+                        if(rotate) {
+                            return 0;
+                        }
+
+                        cl_printfn("cmp r%i, #0x%02X", rn, val);
+                        return 1;
+                    }
+                case 0x4: /* 0100 ADD */
+                    {
+                        if(!imm && !(instruction & 0x1)){
+                            return 0;
+                        }
+                        char rotate = operand2 >> 8;
+                        int val = operand2 & 0xFF;
+                        if(rotate) {
+                            return 0;
+                        }
+
+                        cl_printfn("add r%i, r%i, #0x%02X", rd, rn, val);
+                        return 1;
+                    }
+            }
+            return 0;
+        case 1: /* 01 */
+            return 0;
+        case 2: /* 10 Block Data Transfer, Branch */
+            {
+                if((word >> 24 & 0x0F) == 0x0A) {
+                    /* branch L = 0 */
+                    int offset =(int)(word << 8) >> 6;
+                    char *s_cond;
+                    switch(cond) {
+                        case 0xE:
+                            s_cond = "";
+                            break;
+                        case 0xD:
+                            s_cond = "le";
+                            break;
+                        case 0x01:
+                            s_cond = "ne";
+                            break;
+                        default:
+                            return 0;
+                    }
+
+                    char s_offset[20];
+                    sprintf(s_offset,  offset < 0? "#-0x%02X": "#0x%02X", abs(offset));
+                    cl_printfn("b%s [r15, %s]", s_cond, s_offset);
+                    return 1;
+                }
+            }
+            return 0;
+        case 3: /* 11 */
+        default:
+            return 0;
+    }
 }
 
 static void test_print_asm() {
@@ -112,6 +200,10 @@ static void test_print_asm() {
 
     verify_print_asm(0xE3530000, "cmp r3, #0x00\n");
 
+    verify_print_asm(0xE2422004, "sub r2, r2, #0x04\n");
+
+    verify_print_asm(0xE1A03231, "lsr r3, r1, r2\n");
+    verify_print_asm(0xE203300F, "and r3, r3, #0x0F\n");
 
 }
 

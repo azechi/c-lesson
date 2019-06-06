@@ -26,17 +26,6 @@ static int print_asm(uint32_t word) {
         return 1;
     }
 
-
-    if(0xE3A00000 == (0xFFF00000 & word)) {
-        /* move */
-        int tmp = word & 0x0000FFFF;
-        int rd = tmp >> 12;
-        int op2 = tmp & 0x0FFF;
-
-        cl_printfn("mov r%i, #0x%02X", rd, op2);
-        return 1;
-    }
-
     if(0xE5900000 == (0xFF900000 & word)) {
         /* ldr */
         uint32_t tmp = word & 0x000FFFFF;
@@ -86,18 +75,39 @@ static int print_asm(uint32_t word) {
             int operand2 = rest & 0x00FFF;
             switch(opcode) {
                 case 0xD: /* 1101 MOV {MOV, LSR} */
+                    if(rn) {
+                        return 0;
+                    }
+
                     if(imm == 0) {
+                        char rm = operand2 & 0x00F;
+                        int shift = operand2 >> 4;
+                        if(shift == 0) {
+                            /* MOV */
+                            cl_printfn("mov r%i, r%i", rd, rm);
+                            return 1;
+                        }
+
                         /* LSR */
                         if(!rn
                                 && (operand2 >> 4 & 0x09) != 0x1
                                 && (operand2 >> 5 & 0x01) != 0x1) {
                             return 0;
                         }
-                        char rm = operand2 & 0x00F;
                         char rs = operand2 >> 8;
                         cl_printfn("lsr r3, r1, r2", rd, rm, rs);
                         return 1;
+                    } else {
+                        /* immediate = 1 */
+                        char rotate = operand2 >> 8;
+                        int val = operand2 & 0x0FF;
+                        if(rotate) {
+                            return 0;
+                        }
+                        cl_printfn("mov r%i, #0x%02X", rd, val);
+                        return 1;
                     }
+                    return 0;
                 case 0x0: /* 0000 AND */
                     {
                         if(!imm) {
@@ -146,7 +156,9 @@ static int print_asm(uint32_t word) {
             return 0;
         case 2: /* 10 Block Data Transfer, Branch */
             {
-                if((word >> 24 & 0x0F) == 0x0A) {
+                char *s_link = (word >> 24 & 0x01)? "l": "";
+
+                if((word >> 25 & 0x07) == 0x05) {
                     /* branch L = 0 */
                     int offset =(int)(word << 8) >> 6;
                     char *s_cond;
@@ -166,7 +178,7 @@ static int print_asm(uint32_t word) {
 
                     char s_offset[20];
                     sprintf(s_offset,  offset < 0? "#-0x%02X": "#0x%02X", abs(offset));
-                    cl_printfn("b%s [r15, %s]", s_cond, s_offset);
+                    cl_printfn("b%s%s [r15, %s]", s_link, s_cond, s_offset);
                     return 1;
                 }
             }

@@ -57,135 +57,183 @@ static int print_asm(uint32_t word) {
         }
     }
 
-    char cond = word >> 28 & 0xF;
-    int instruction = word >> 20 & 0x0FF; /* instruction is always positive */
-    int rest = word & 0x000FFFFF; /* rest is always positive */
-    switch (instruction >> 6) {
-        case 0:
-            /* 00 data processing, multiply, sigle data swap */
-            if(cond != 0xE && instruction & 0x1) {
-                /* set condition codes = 1 */
+    {
+        if((word & 0x0E000000) == 0x08000000) {
+            /* block data transfer  */
+            char cond = word >> 28 & 0x0F;
+            if(cond != 0x0E) {
                 return 0;
             }
 
-            char imm = instruction >> 5;
-            char opcode = instruction >> 1 & 0x0F;
-            char rn = rest >> 16;
-            char rd = rest >> 12 & 0x0F;
-            int operand2 = rest & 0x00FFF;
-            switch(opcode) {
-                case 0xD: /* 1101 MOV {MOV, LSR} */
-                    if(rn) {
-                        return 0;
-                    }
+            char *s_op;
+            char *s_writeback;
+            switch(word >> 20 & 0x0FF) {
+                case 0x92:
+                    s_op = "stmdb";
+                    s_writeback = "!";
+                    break;
+                case 0x8B:
+                    s_op = "ldmia";
+                    s_writeback = "!";
+                    break;
+                default:
+                    return 0;
+            }
 
-                    if(imm == 0) {
-                        char rm = operand2 & 0x00F;
-                        int shift = operand2 >> 4;
-                        if(shift == 0) {
-                            /* MOV */
-                            cl_printfn("mov r%i, r%i", rd, rm);
+            char rn = word >> 16 & 0x000F;
+            char *s_register_list;
+            switch(word & 0x0000FFFF) {
+                case 0x4002:
+                    s_register_list = "{r1, r14}";
+                    break;
+                case 0x4006:
+                    s_register_list = "{r1, r2, r14}";
+                    break;
+                default:
+                    return 0;
+            }
+
+            cl_printfn("%s r%i%s, %s", s_op, rn, s_writeback, s_register_list);
+            return 1;
+
+        }
+    }
+
+    {
+        char cond = word >> 28 & 0xF;
+        int instruction = word >> 20 & 0x0FF; /* instruction is always positive */
+        int rest = word & 0x000FFFFF; /* rest is always positive */
+        switch (instruction >> 6) {
+            case 0:
+                /* 00 data processing, multiply, sigle data swap */
+                if(cond != 0xE && instruction & 0x1) {
+                    /* set condition codes = 1 */
+                    return 0;
+                }
+
+                char imm = instruction >> 5;
+                char opcode = instruction >> 1 & 0x0F;
+                char rn = rest >> 16;
+                char rd = rest >> 12 & 0x0F;
+                int operand2 = rest & 0x00FFF;
+                switch(opcode) {
+                    case 0xD: /* 1101 MOV {MOV, LSR} */
+                        if(rn) {
+                            return 0;
+                        }
+
+                        if(imm == 0) {
+                            char rm = operand2 & 0x00F;
+                            int shift = operand2 >> 4;
+                            if(shift == 0) {
+                                /* MOV */
+                                cl_printfn("mov r%i, r%i", rd, rm);
+                                return 1;
+                            }
+
+                            /* LSR */
+                            if(!rn
+                                    && (operand2 >> 4 & 0x09) != 0x1
+                                    && (operand2 >> 5 & 0x01) != 0x1) {
+                                return 0;
+                            }
+                            char rs = operand2 >> 8;
+                            cl_printfn("lsr r3, r1, r2", rd, rm, rs);
+                            return 1;
+                        } else {
+                            /* immediate = 1 */
+                            char rotate = operand2 >> 8;
+                            int val = operand2 & 0x0FF;
+                            if(rotate) {
+                                if(operand2 == 0x302) {
+                                    cl_printfn("ldr r%i, #0x%02X", rd, 0x8000000);
+                                    return 1;
+                                }
+                                return 0;
+                            }
+                            cl_printfn("mov r%i, #0x%02X", rd, val);
                             return 1;
                         }
+                        return 0;
+                    case 0x0: /* 0000 AND */
+                        {
+                            if(!imm) {
+                                return 0;
+                            }
+                            char rotate = operand2 >> 8;
+                            int val = operand2 & 0x0FF;
+                            if(rotate) {
+                                return 0;
+                            }
 
-                        /* LSR */
-                        if(!rn
-                                && (operand2 >> 4 & 0x09) != 0x1
-                                && (operand2 >> 5 & 0x01) != 0x1) {
-                            return 0;
+                            cl_printfn("and r%i, r%i, #0x%02X", rd, rn, val);
+                            return 1;
                         }
-                        char rs = operand2 >> 8;
-                        cl_printfn("lsr r3, r1, r2", rd, rm, rs);
-                        return 1;
-                    } else {
-                        /* immediate = 1 */
-                        char rotate = operand2 >> 8;
-                        int val = operand2 & 0x0FF;
-                        if(rotate) {
-                            return 0;
-                        }
-                        cl_printfn("mov r%i, #0x%02X", rd, val);
-                        return 1;
-                    }
-                    return 0;
-                case 0x0: /* 0000 AND */
-                    {
-                        if(!imm) {
-                            return 0;
-                        }
-                        char rotate = operand2 >> 8;
-                        int val = operand2 & 0x0FF;
-                        if(rotate) {
-                            return 0;
-                        }
+                    case 0xA: /* 1010 CMP  */
+                        {
+                            if(!imm && !(instruction & 0x1)){
+                                return 0;
+                            }
+                            char rotate = operand2 >> 8;
+                            int val = operand2 & 0xFF;
+                            if(rotate) {
+                                return 0;
+                            }
 
-                        cl_printfn("and r%i, r%i, #0x%02X", rd, rn, val);
-                        return 1;
-                    }
-                case 0xA: /* 1010 CMP  */
-                    {
-                        if(!imm && !(instruction & 0x1)){
-                            return 0;
+                            cl_printfn("cmp r%i, #0x%02X", rn, val);
+                            return 1;
                         }
-                        char rotate = operand2 >> 8;
-                        int val = operand2 & 0xFF;
-                        if(rotate) {
-                            return 0;
+                    case 0x4: /* 0100 ADD */
+                        {
+                            if(!imm && !(instruction & 0x1)){
+                                return 0;
+                            }
+                            char rotate = operand2 >> 8;
+                            int val = operand2 & 0xFF;
+                            if(rotate) {
+                                return 0;
+                            }
+
+                            cl_printfn("add r%i, r%i, #0x%02X", rd, rn, val);
+                            return 1;
                         }
-
-                        cl_printfn("cmp r%i, #0x%02X", rn, val);
-                        return 1;
-                    }
-                case 0x4: /* 0100 ADD */
-                    {
-                        if(!imm && !(instruction & 0x1)){
-                            return 0;
-                        }
-                        char rotate = operand2 >> 8;
-                        int val = operand2 & 0xFF;
-                        if(rotate) {
-                            return 0;
-                        }
-
-                        cl_printfn("add r%i, r%i, #0x%02X", rd, rn, val);
-                        return 1;
-                    }
-            }
-            return 0;
-        case 1: /* 01 */
-            return 0;
-        case 2: /* 10 Block Data Transfer, Branch */
-            {
-                char *s_link = (word >> 24 & 0x01)? "l": "";
-
-                if((word >> 25 & 0x07) == 0x05) {
-                    /* branch L = 0 */
-                    int offset =(int)(word << 8) >> 6;
-                    char *s_cond;
-                    switch(cond) {
-                        case 0xE:
-                            s_cond = "";
-                            break;
-                        case 0xD:
-                            s_cond = "le";
-                            break;
-                        case 0x01:
-                            s_cond = "ne";
-                            break;
-                        default:
-                            return 0;
-                    }
-
-                    char s_offset[20];
-                    sprintf(s_offset,  offset < 0? "#-0x%02X": "#0x%02X", abs(offset));
-                    cl_printfn("b%s%s [r15, %s]", s_link, s_cond, s_offset);
-                    return 1;
                 }
-            }
-            return 0;
-        case 3: /* 11 */
-        default:
-            return 0;
+                return 0;
+            case 1: /* 01 */
+                return 0;
+            case 2: /* 10 Block Data Transfer, Branch */
+                {
+                    char *s_link = (word >> 24 & 0x01)? "l": "";
+
+                    if((word >> 25 & 0x07) == 0x05) {
+                        /* branch L = 0 */
+                        int offset =(int)(word << 8) >> 6;
+                        char *s_cond;
+                        switch(cond) {
+                            case 0xE:
+                                s_cond = "";
+                                break;
+                            case 0xD:
+                                s_cond = "le";
+                                break;
+                            case 0x01:
+                                s_cond = "ne";
+                                break;
+                            default:
+                                return 0;
+                        }
+
+                        char s_offset[20];
+                        sprintf(s_offset,  offset < 0? "#-0x%02X": "#0x%02X", abs(offset));
+                        cl_printfn("b%s%s [r15, %s]", s_link, s_cond, s_offset);
+                        return 1;
+                    }
+                }
+                return 0;
+            case 3: /* 11 */
+            default:
+                return 0;
+        }
     }
 }
 
@@ -217,6 +265,9 @@ static void test_print_asm() {
     verify_print_asm(0xE1A03231, "lsr r3, r1, r2\n");
     verify_print_asm(0xE203300F, "and r3, r3, #0x0F\n");
 
+    verify_print_asm(0xE3A0D302, "ldr r13, #0x8000000\n");
+
+    verify_print_asm(0xE92D4002, "stmdb r13!, {r1, r14}\n");
 }
 
 

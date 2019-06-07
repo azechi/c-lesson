@@ -7,235 +7,217 @@
 #include "cl_utils.h"
 
 static void assert_str_eq(const char *expect, const char *actual);
-static void verify_print_asm_unknown(uint32_t input);
-static void verify_print_asm(uint32_t input, const char *expect);
+static void verify_print_asm_unknown(int input);
+static void verify_print_asm(int input, const char *expect);
+
+static int print_asm_data_processing(int word);
+static int print_asm_single_data_transfer(int word);
+static int print_asm_block_data_transfer(int word);
+static int print_asm_branch(int word);
 
 
-static int print_asm(uint32_t word) {
-    if(0xE2400000 == (0xFFF00000 & word)) {
-        /* sub */
-        int r_op1 = (word >> 16) & 0xF;
-        int r_dest = (word >> 12) & 0xF;
+static int print_asm(int word) {
+    if((word & 0x0C000000) == 0x00000000) {
+        return print_asm_data_processing(word);
+    }
 
-        int rotate = (word >> 4) & 0xF;
-        if(rotate != 0) {
+    if((word & 0x0C000000) == 0x04000000) {
+        return print_asm_single_data_transfer(word);
+    }
+
+    if((word & 0x0E000000) == 0x08000000) {
+        return print_asm_block_data_transfer(word);
+    }
+
+    if((word & 0x0E000000) == 0x0A000000) {
+        return print_asm_branch(word);
+    }
+
+    return 0;
+
+}
+
+static int print_asm_data_processing(int word) {
+    if((word & 0xF0000000) != 0xE0000000 ) {
+        return 0;
+    }
+
+    int rn = word >> 16 & 0x0F;
+    int rd = word >> 12 & 0x0F;
+
+    char *s_op;
+    char is_mov = 0;
+    char is_cmp = 0;
+    switch(word & 0x01F00000) {
+        /* operation code + set condition code */
+        case 0x00000000:
+            s_op = "and";
+            break;
+        case 0x00800000:
+            s_op = "add";
+            break;
+        case 0x00400000:
+            s_op = "sub";
+            break;
+        case 0x01A00000:
+            s_op = "mov";
+            is_mov = 1;
+            break;
+        case 0x01500000:
+            s_op = "cmp";
+            is_cmp = 1;
+            break;
+        default:
+            return 0;
+    }
+
+    if(word & 0x02000000) {
+        /* operand2 is an immediate value */
+        char rotate = word >> 8 & 0x0F;
+        int imm = word & 0xFF;
+        int val;
+        if(rotate) {
+            if((word & 0xFFF) == 0x302) {
+                val = 0x08000000;
+            } else {
+                return 0;
+            }
+        } else {
+            val = imm;
+        }
+
+        if(is_cmp) {
+            cl_printfn("cmp r%i, #0x%02X", rn, val);
+        } else if(is_mov) {
+            cl_printfn("mov r%i, #0x%02X", rd, val);
+        } else {
+            cl_printfn("%s r%i, r%i, #0x%02X", s_op, rd, rn, val);
+        }
+        return 1;
+    } else {
+        /* operand2 is a register */
+        int shift = word >> 4 & 0xFF;
+        char rm = word & 0x0F;
+
+        if((word & 0x00000FF0) == 0) {
+            cl_printfn("mov r%i, r%i", rd, rm);
+            return 1;
+        }
+
+        if(!(shift & 0x01)) {
+            /* shift amount immediate  */
             return 0;
         }
-        int imm = word & 0xFF;
-        cl_printfn("sub r%i, r%i, #0x%02X", r_dest, r_op1, imm);
-        return 1;
-    }
 
-    if(0xE5900000 == (0xFF900000 & word)) {
-        /* ldr */
-        uint32_t tmp = word & 0x000FFFFF;
-        uint32_t rn = tmp >> 16;
-        uint32_t rd = (tmp & 0x0FFFF) >> 12;
-        uint32_t offset = tmp & 0xFFF;
-
-        uint32_t b = (word >> 20) & 0x004; /* byte/word */
-        char *op = b ? "ldrb": "ldr";
-
-        if(offset == 0){
-            cl_printfn("%s r%i, [r%i]", op, rd, rn);
-        }else {
-            cl_printfn("%s r%i, [r%i, #0x%02X]", op, rd, rn, offset);
-        }
-        return 1;
-    }
-
-    if(0xE5800000 == (0xFF800000 & word)) {
-        /* str */
-        int tmp = word & 0x000FFFFF;
-        int rn = tmp >> 16; /* base register */
-        int rd = (tmp & 0x0FFFF) >> 12; /* source/destination register */
-        int offset = tmp & 0xFFF;
-
-        if(offset == 0) {
-            cl_printfn("str r%i, [r%i]", rd, rn);
-            return 1;
-        }
-    }
-
-    {
-        if((word & 0x0E000000) == 0x08000000) {
-            /* block data transfer  */
-            char cond = word >> 28 & 0x0F;
-            if(cond != 0x0E) {
-                return 0;
-            }
-
-            char *s_op;
-            char *s_writeback;
-            switch(word >> 20 & 0x0FF) {
-                case 0x92:
-                    s_op = "stmdb";
-                    s_writeback = "!";
-                    break;
-                case 0x8B:
-                    s_op = "ldmia";
-                    s_writeback = "!";
-                    break;
-                default:
-                    return 0;
-            }
-
-            char rn = word >> 16 & 0x000F;
-            char *s_register_list;
-            switch(word & 0x0000FFFF) {
-                case 0x4002:
-                    s_register_list = "{r1, r14}";
-                    break;
-                case 0x4006:
-                    s_register_list = "{r1, r2, r14}";
-                    break;
-                default:
-                    return 0;
-            }
-
-            cl_printfn("%s r%i%s, %s", s_op, rn, s_writeback, s_register_list);
-            return 1;
-
-        }
-    }
-
-    {
-        char cond = word >> 28 & 0xF;
-        int instruction = word >> 20 & 0x0FF; /* instruction is always positive */
-        int rest = word & 0x000FFFFF; /* rest is always positive */
-        switch (instruction >> 6) {
-            case 0:
-                /* 00 data processing, multiply, sigle data swap */
-                if(cond != 0xE && instruction & 0x1) {
-                    /* set condition codes = 1 */
-                    return 0;
-                }
-
-                char imm = instruction >> 5;
-                char opcode = instruction >> 1 & 0x0F;
-                char rn = rest >> 16;
-                char rd = rest >> 12 & 0x0F;
-                int operand2 = rest & 0x00FFF;
-                switch(opcode) {
-                    case 0xD: /* 1101 MOV {MOV, LSR} */
-                        if(rn) {
-                            return 0;
-                        }
-
-                        if(imm == 0) {
-                            char rm = operand2 & 0x00F;
-                            int shift = operand2 >> 4;
-                            if(shift == 0) {
-                                /* MOV */
-                                cl_printfn("mov r%i, r%i", rd, rm);
-                                return 1;
-                            }
-
-                            /* LSR */
-                            if(!rn
-                                    && (operand2 >> 4 & 0x09) != 0x1
-                                    && (operand2 >> 5 & 0x01) != 0x1) {
-                                return 0;
-                            }
-                            char rs = operand2 >> 8;
-                            cl_printfn("lsr r3, r1, r2", rd, rm, rs);
-                            return 1;
-                        } else {
-                            /* immediate = 1 */
-                            char rotate = operand2 >> 8;
-                            int val = operand2 & 0x0FF;
-                            if(rotate) {
-                                if(operand2 == 0x302) {
-                                    cl_printfn("ldr r%i, #0x%02X", rd, 0x8000000);
-                                    return 1;
-                                }
-                                return 0;
-                            }
-                            cl_printfn("mov r%i, #0x%02X", rd, val);
-                            return 1;
-                        }
-                        return 0;
-                    case 0x0: /* 0000 AND */
-                        {
-                            if(!imm) {
-                                return 0;
-                            }
-                            char rotate = operand2 >> 8;
-                            int val = operand2 & 0x0FF;
-                            if(rotate) {
-                                return 0;
-                            }
-
-                            cl_printfn("and r%i, r%i, #0x%02X", rd, rn, val);
-                            return 1;
-                        }
-                    case 0xA: /* 1010 CMP  */
-                        {
-                            if(!imm && !(instruction & 0x1)){
-                                return 0;
-                            }
-                            char rotate = operand2 >> 8;
-                            int val = operand2 & 0xFF;
-                            if(rotate) {
-                                return 0;
-                            }
-
-                            cl_printfn("cmp r%i, #0x%02X", rn, val);
-                            return 1;
-                        }
-                    case 0x4: /* 0100 ADD */
-                        {
-                            if(!imm && !(instruction & 0x1)){
-                                return 0;
-                            }
-                            char rotate = operand2 >> 8;
-                            int val = operand2 & 0xFF;
-                            if(rotate) {
-                                return 0;
-                            }
-
-                            cl_printfn("add r%i, r%i, #0x%02X", rd, rn, val);
-                            return 1;
-                        }
-                }
-                return 0;
-            case 1: /* 01 */
-                return 0;
-            case 2: /* 10 Block Data Transfer, Branch */
-                {
-                    char *s_link = (word >> 24 & 0x01)? "l": "";
-
-                    if((word >> 25 & 0x07) == 0x05) {
-                        /* branch L = 0 */
-                        int offset =(int)(word << 8) >> 6;
-                        char *s_cond;
-                        switch(cond) {
-                            case 0xE:
-                                s_cond = "";
-                                break;
-                            case 0xD:
-                                s_cond = "le";
-                                break;
-                            case 0x01:
-                                s_cond = "ne";
-                                break;
-                            default:
-                                return 0;
-                        }
-
-                        char s_offset[20];
-                        sprintf(s_offset,  offset < 0? "#-0x%02X": "#0x%02X", abs(offset));
-                        cl_printfn("b%s%s [r15, %s]", s_link, s_cond, s_offset);
-                        return 1;
-                    }
-                }
-                return 0;
-            case 3: /* 11 */
+       char rs = word >> 8 & 0x0F;
+       switch(word & 0x000000F0) {
+            case 0x30:
+                /* lsr */
+               cl_printfn("lsr r%i, r%i, r%i", rd, rm, rs);
+               return 1;
             default:
-                return 0;
-        }
+               return 0;
+       }
     }
 }
+
+static int print_asm_single_data_transfer(int word) {
+    if((word & 0xF0000000) != 0xE0000000 ) {
+        return 0;
+    }
+
+    int rn = word >> 16 & 0x0F;
+    int rd = word >> 12 & 0x0F;
+    int offset = word & 0xFFF;
+
+    char *s_op;
+    switch(word & 0x0FF00000) {
+        case 0x05800000:
+            s_op = "str";
+            break;
+        case 0x05900000:
+            s_op = "ldr";
+            break;
+        case 0x05D00000:
+            s_op = "ldrb";
+            break;
+        default:
+            return 0;
+    }
+
+    char *s_sign = (offset < 0)? "-": "";
+
+    if(offset) {
+        cl_printfn("%s r%i, [r%i, #%s0x%02X]", s_op, rd, rn, s_sign, offset);
+    } else {
+        cl_printfn("%s r%i, [r%i]", s_op, rd, rn);
+    }
+    return 1;
+}
+
+static int print_asm_block_data_transfer(int word) {
+    if((word & 0xF0000000) != 0xE0000000 ) {
+        return 0;
+    }
+
+    char *s_op;
+    char *s_writeback;
+    switch(word >> 20 & 0x0FF) {
+        case 0x92:
+            s_op = "stmdb";
+            s_writeback = "!";
+            break;
+        case 0x8B:
+            s_op = "ldmia";
+            s_writeback = "!";
+            break;
+        default:
+            return 0;
+    }
+
+    char rn = word >> 16 & 0x0F;
+    char *s_register_list;
+    switch(word & 0x0000FFFF) {
+        case 0x4002:
+            s_register_list = "{r1, r14}";
+            break;
+        case 0x4006:
+            s_register_list = "{r1, r2, r14}";
+            break;
+        default:
+            return 0;
+    }
+
+    cl_printfn("%s r%i%s, %s", s_op, rn, s_writeback, s_register_list);
+    return 1;
+}
+
+static int print_asm_branch(int word) {
+
+    char *s_cond;
+    switch(word & 0xF0000000) {
+        case 0xE0000000:
+            s_cond = "";
+            break;
+        case 0xD0000000:
+            s_cond = "le";
+            break;
+        case 0x10000000:
+            s_cond = "ne";
+            break;
+        default:
+            return 0;
+    }
+
+    char *s_link = (word & 0x01000000)? "l": "";
+
+    int offset =(int)(word << 8) >> 6;
+    char *s_sign = (offset < 0)? "-": "";
+
+    cl_printfn("b%s%s [r15, #%s0x%02X]", s_link, s_cond, s_sign ,abs(offset));
+    return 1;
+}
+
 
 static void test_print_asm() {
     verify_print_asm_unknown(0x64646464);
@@ -243,6 +225,7 @@ static void test_print_asm() {
     verify_print_asm(0xE3A01068, "mov r1, #0x68\n");
     verify_print_asm(0xE3A0106C, "mov r1, #0x6C\n");
     verify_print_asm(0xE3A0200A, "mov r2, #0x0A\n");
+    verify_print_asm(0xE1A0F00E, "mov r15, r14\n");
 
     verify_print_asm(0xEAFFFFFE, "b [r15, #-0x08]\n");
     verify_print_asm(0x1AFFFFFA, "bne [r15, #-0x18]\n");
@@ -265,7 +248,7 @@ static void test_print_asm() {
     verify_print_asm(0xE1A03231, "lsr r3, r1, r2\n");
     verify_print_asm(0xE203300F, "and r3, r3, #0x0F\n");
 
-    verify_print_asm(0xE3A0D302, "ldr r13, #0x8000000\n");
+    verify_print_asm(0xE3A0D302, "mov r13, #0x8000000\n");
 
     verify_print_asm(0xE92D4002, "stmdb r13!, {r1, r14}\n");
 }
@@ -286,9 +269,10 @@ int main(int argc, char *argv[]) {
     }
 
     int count = 0x00010000;
-    uint32_t word;
+    int word;
     int unknown = 0;
     /* ファイルサイズが必ず4byteで割り切れるとする */
+    /* hostはリトルエンディアンとする */
     while(fread(&word, 4, 1, f)) {
         cl_printf("0x%08X ", count);
         if(unknown || (unknown = !print_asm(word))){
@@ -307,7 +291,7 @@ static void assert_str_eq(const char *expect, const char *actual) {
     assert(eq);
 }
 
-static void verify_print_asm_unknown(uint32_t input) {
+static void verify_print_asm_unknown(int input) {
     cl_enable_buffer_mode();
     cl_clear_output();
 
@@ -315,7 +299,7 @@ static void verify_print_asm_unknown(uint32_t input) {
     assert(unknown);
 }
 
-static void verify_print_asm(uint32_t input, const char *expect) {
+static void verify_print_asm(int input, const char *expect) {
     cl_enable_buffer_mode();
     cl_clear_output();
 

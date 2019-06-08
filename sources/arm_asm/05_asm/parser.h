@@ -17,7 +17,9 @@ int str_eq_subs(const char *s, const Substring *subs);
 
 int parse_one(const char *s, Substring *out_subs);
 int parse_register(const char *s, int *out_register);
+int parse_immediate(const char *s, int *out_immediate);
 int skip_comma(const char *s);
+int is_register(const char *s);
 
 void parser_test();
 

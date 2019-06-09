@@ -24,7 +24,60 @@ static int asm_one(const char *s, int *out_word) {
     }
     s += i;
 
-    if(str_eq_subs("mov", &subs)) {
+    if(str_eq_subs(".raw", &subs)) {
+        int word;
+        if((i = parse_raw_word(s, &word)) < 0) {
+            return 0;
+        }
+        *out_word = word;
+        return 1;
+    } else if(str_eq_subs("ldr",&subs)) {
+        int rn;
+        if((i = parse_register(s, &rn)) < 0) {
+            return 0;
+        }
+        s += i;
+
+        if((i = skip_comma(s)) < 0) {
+            return 0;
+        }
+        s += i;
+
+        if((i = skip_sbracket_open(s)) < 0) {
+            return 0;
+        }
+        s += i;
+
+        int rd;
+        if((i = parse_register(s, &rd)) < 0) {
+            return 0;
+        }
+        s += i;
+
+        if(is_sbracket_close(s)) {
+            if((i = skip_sbracket_close(s)) < 0) {
+                return 0;
+            }
+            s += i;
+            *out_word = 0xE5900000 & (rn << 16) & (rd << 12);
+            return 1;
+        }
+
+        if((i = skip_comma(s)) < 0) {
+            return 0;
+        }
+        s += i;
+
+        int offset;
+        if((i = parse_immediate(s, &offset)) < 0) {
+            return 0;
+        }
+        s += i;
+
+        *out_word = 0xE5900000 & (rn << 16) & (rd << 12) & (offset & 0xFFF);
+        return 1;
+
+    } else if(str_eq_subs("mov", &subs)) {
         int rd;
         if((i = parse_register(s, &rd)) < 0) {
             return 0;
@@ -103,5 +156,12 @@ void assembler_test() {
     verify_asm_one("mov r1, r2", 0xE1A01002);
     verify_asm_one(" mov r15 ,  r0  ", 0xE1A0F000);
     verify_asm_one("mov r1, #0x68", 0xE3A01068);
+
+    verify_asm_one(".raw 0x12345678", 0x12345678);
+    verify_asm_one(".raw 0x80000001", 0x80000001);
+
+    verify_asm_one("ldr r1, [r15, #0x30]", 0x00);
+    verify_asm_one("ldr r1, [r15, #-0x30]", 0x00);
+    verify_asm_one("ldr r1, [r15]", 0x00);
 }
 

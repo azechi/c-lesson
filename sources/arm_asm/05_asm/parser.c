@@ -61,10 +61,46 @@ int parse_register(const char *s, int *out_register) {
     return PARSE_FAILURE;
 }
 
+int parse_raw_word(const char *s, int *out_word) {
+    int i = skip(s, is_space);
+    if(s[i++] != '0' || toupper(s[i++]) != 'X') {
+        return PARSE_FAILURE;
+    }
+
+    if(isxdigit(s[i])) {
+        int len = skip(s + i, isxdigit);
+        if(len != 8){
+            return PARSE_FAILURE;
+        }
+
+        int n;
+        char c;
+        for(; len > 0; len--) {
+            c = s[i++];
+            n = (n << 4) + ((isdigit(c))? c - '0': toupper(c) - 'A' + 10);
+        }
+
+        *out_word = n;
+        return i;
+    }
+
+    return PARSE_FAILURE;
+}
+
 int parse_immediate(const char *s, int *out_immediate) {
     int i = skip(s, is_space);
 
-    if(s[i++] != '#' || s[i++] != '0' || toupper(s[i++]) != 'X') {
+    if(s[i++] != '#') {
+        return PARSE_FAILURE;
+    }
+
+    int minus = 1;
+    if(s[i] == '-') {
+        minus = -1;
+        i++;
+    }
+
+    if(s[i++] != '0' || toupper(s[i++]) != 'X') {
         return PARSE_FAILURE;
     }
 
@@ -76,6 +112,7 @@ int parse_immediate(const char *s, int *out_immediate) {
             c = s[i++];
             n = n * 16 + ((isdigit(c))? c - '0': toupper(c) -'A' + 10);
         }
+        n *= minus;
 
         if(n < (int)0x80000000 || (int)0x7FFFFFFF < n) {
             return PARSE_FAILURE;
@@ -93,9 +130,30 @@ int is_register(const char *s) {
     return toupper(s[i]) == 'R';
 }
 
+int is_sbracket_close(const char *s) {
+    int i = skip(s, is_space);
+    return s[i] == ']';
+}
+
 int skip_comma(const char *s) {
     int i = skip(s, is_space);
     if(s[i] == ',') {
+        return ++i;
+    }
+    return PARSE_FAILURE;
+}
+
+int skip_sbracket_open(const char *s) {
+    int i = skip(s, is_space);
+    if(s[i] == '[') {
+        return ++i;
+    }
+    return PARSE_FAILURE;
+}
+
+int skip_sbracket_close(const char *s) {
+    int i = skip(s, is_space);
+    if(s[i] == ']') {
         return ++i;
     }
     return PARSE_FAILURE;
@@ -114,7 +172,7 @@ static int is_space(int c) {
 }
 
 static int is_one_first(int c) {
-    return c == '_' || isalpha(c);
+    return c == '_' || c == '.' || isalpha(c);
 }
 
 static int is_one_rest(int c) {

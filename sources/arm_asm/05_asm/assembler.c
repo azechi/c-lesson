@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdlib.h>
 
 #include "parser.h"
 #include "assembler.h"
@@ -31,9 +32,12 @@ static int asm_one(const char *s, int *out_word) {
         }
         *out_word = word;
         return 1;
-    } else if(str_eq_subs("ldr",&subs)) {
-        int rn;
-        if((i = parse_register(s, &rn)) < 0) {
+    } else if(str_eq_subs("ldr", &subs) || str_eq_subs("str", &subs)) {
+
+        int l_bit = str_eq_subs("ldr", &subs)? 0x00100000: 0;
+
+        int rd;
+        if((i = parse_register(s, &rd)) < 0) {
             return 0;
         }
         s += i;
@@ -48,8 +52,8 @@ static int asm_one(const char *s, int *out_word) {
         }
         s += i;
 
-        int rd;
-        if((i = parse_register(s, &rd)) < 0) {
+        int rn;
+        if((i = parse_register(s, &rn)) < 0) {
             return 0;
         }
         s += i;
@@ -59,7 +63,7 @@ static int asm_one(const char *s, int *out_word) {
                 return 0;
             }
             s += i;
-            *out_word = 0xE5900000 & (rn << 16) & (rd << 12);
+            *out_word = 0xE5800000 + l_bit + (rn << 16) + (rd << 12);
             return 1;
         }
 
@@ -74,7 +78,9 @@ static int asm_one(const char *s, int *out_word) {
         }
         s += i;
 
-        *out_word = 0xE5900000 & (rn << 16) & (rd << 12) & (offset & 0xFFF);
+        int u_bit = (offset < 0)? 0: 0x00800000;
+
+        *out_word = 0xE5000000 + l_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF);
         return 1;
 
     } else if(str_eq_subs("mov", &subs)) {
@@ -160,8 +166,10 @@ void assembler_test() {
     verify_asm_one(".raw 0x12345678", 0x12345678);
     verify_asm_one(".raw 0x80000001", 0x80000001);
 
-    verify_asm_one("ldr r1, [r15, #0x30]", 0x00);
-    verify_asm_one("ldr r1, [r15, #-0x30]", 0x00);
-    verify_asm_one("ldr r1, [r15]", 0x00);
+    verify_asm_one("ldr r1, [r15, #0x30]", 0xE59F1030);
+    verify_asm_one("ldr r1, [r15, #-0x30]", 0xE51F1030);
+    verify_asm_one("ldr r1, [r15]", 0xE59F1000);
+    verify_asm_one("str r0, [r1]", 0xE5810000);
 }
+
 

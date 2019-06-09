@@ -1,27 +1,28 @@
-#include <string.h>
 #include <stdio.h>
+#include "cl_getline.h"
 #include "assembler.h"
 #include "parser.h"
 
 
-/*
-#define BUF_SIZE 80
-static char buf[BUF_SIZE];
-static int cl_getline(char **out_buf);
-*/
+int main(int argc, char *argv[]) {
 
-int main() {
+    if(argc <= 1) {
+        parser_test();
+        assembler_test();
 
-    parser_test();
-    assembler_test();
+        return 0;
+    }
 
+    if(!cl_getline_set_file(argv[1])) {
+        return 1;
+    }
+
+    char bin[100*1024];
+    Emitter emitter = {.buf = bin, .pos = 0};
+    if(!assemble(&emitter)) {
+        return 1;
+    }
+
+    fwrite(emitter.buf, sizeof(char), emitter.pos, stdout);
 }
 
-/*
-int cl_getline(char **out_buf) {
-
-    strcpy(buf, "mov r1, r2");
-    *out_buf = buf;
-    return strlen(buf);
-}
-*/

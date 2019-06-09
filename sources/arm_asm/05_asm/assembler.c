@@ -1,28 +1,45 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "cl_getline.h"
 #include "parser.h"
 #include "assembler.h"
 
 #define assert_fail(msg) assert(0&&(msg))
 
-typedef struct Emitter_ {
-    char *buff;
-    int pos;
-} Emitter;
+static int asm_one(const char *s, int *out_word);
+static void emit_word(Emitter *emitter, int oneword);
 
 
-char bin[100*1024];
-Emitter emitter = {.buff = bin, .pos = 0};
+int assemble(Emitter *emitter) {
+    char *str;
+    while(cl_getline(&str) >= 0) {
+        int word;
+        if(!asm_one(str, &word)) {
+            return 0;
+        }
+
+        if(word) {
+            /* skip empty line, empty word */
+            emit_word(emitter, word);
+        }
+    }
+    return 1;
+}
 
 static int asm_one(const char *s, int *out_word) {
 
     int i;
     Substring subs = {0};
     i = parse_one(s, &subs);
-    if(i == PARSE_EOF || i == PARSE_FAILURE) {
+    if(i == PARSE_FAILURE) {
         return 0;
     }
+    if(i == PARSE_EOF) {
+        *out_word = 0;
+        return 1;
+    }
+
     s += i;
 
     if(str_eq_subs(".raw", &subs)) {
@@ -123,32 +140,12 @@ static int asm_one(const char *s, int *out_word) {
     return 0;
 }
 
-/*
-
-static void emit_word(Emitter *emitter, int oneword);
-
-int assemble() {
-    char *str;
-    while(cl_getline(&str) >= 0) {
-         TODO skip empty line
-        int word = asm_one(str);
-
-         TODO skip empty word
-        emit_word(&emitter, word);
-    }
-    return 0;
+static void emit_word(Emitter *emitter, int word) {
+    emitter->buf[emitter->pos++] = word & 0xFF;
+    emitter->buf[emitter->pos++] = word >> 8 & 0xFF;
+    emitter->buf[emitter->pos++] = word >> 16 & 0xFF;
+    emitter->buf[emitter->pos++] = word >> 24 & 0xFF;
 }
-*/
-
-/*
-static void emit_word(Emitter *emitter, int oneword) {
-    emitter->buff[++emitter->pos] = oneword & 0xFF;
-    emitter->buff[++emitter->pos] = oneword >> 8  & 0xFF;
-    emitter->buff[++emitter->pos] = oneword >> 16 & 0xFF;
-    emitter->buff[++emitter->pos] = oneword >> 24 & 0xFF;
-}
-*/
-
 
 /* unit test */
 static void verify_asm_one(const char *input, int expect) {

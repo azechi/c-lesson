@@ -1,10 +1,12 @@
 #ifndef ASSEMBLER_H
 #define ASSEMBLER_H
 
-extern char bin[100*1024];
+typedef struct Emitter_ {
+    char *buf;
+    int pos;
+} Emitter;
 
-int assemble();
-
+int assemble(Emitter *emitter);
 void assembler_test();
 
 #endif

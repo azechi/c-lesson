@@ -10,11 +10,6 @@ static int is_one_first(int c);
 static int is_one_rest(int c);
 
 
-int str_eq_subs(const char *s, const Substring *subs) {
-    int len = strlen(s);
-    return len == subs->len && strncmp(s, subs->str, len) == 0;
-}
-
 int parse_one(const char *s, Substring *out_subs) {
     int i = skip(s, is_space);
     char c = s[i];

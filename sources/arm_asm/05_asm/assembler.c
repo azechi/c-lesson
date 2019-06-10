@@ -3,12 +3,14 @@
 
 #include "cl_getline.h"
 #include "parser.h"
+#include "symbol.h"
 #include "assembler.h"
 
 #define assert_fail(msg) assert(0&&(msg))
 
 static int asm_one(const char *s, int *out_word);
 static void emit_word(Emitter *emitter, int oneword);
+
 
 
 int assemble(Emitter *emitter) {
@@ -19,8 +21,8 @@ int assemble(Emitter *emitter) {
             return 0;
         }
 
+        /* skip empty line, empty word */
         if(word) {
-            /* skip empty line, empty word */
             emit_word(emitter, word);
         }
     }
@@ -42,15 +44,15 @@ static int asm_one(const char *s, int *out_word) {
 
     s += i;
 
-    if(str_eq_subs(".raw", &subs)) {
+    int mnemonic = to_mnemonic_symbol(&subs);
+    if(mnemonic == mnemonic_raw) {
         int word;
         if((i = parse_raw_word(s, &word)) < 0) {
             return 0;
         }
         *out_word = word;
         return 1;
-    } else if(str_eq_subs("ldr", &subs) || str_eq_subs("str", &subs)) {
-
+    } else if(mnemonic_ldr == mnemonic || mnemonic_str == mnemonic) {
         int l_bit = str_eq_subs("ldr", &subs)? 0x00100000: 0;
 
         int rd;
@@ -99,8 +101,7 @@ static int asm_one(const char *s, int *out_word) {
 
         *out_word = 0xE5000000 + l_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF);
         return 1;
-
-    } else if(str_eq_subs("mov", &subs)) {
+    } else if(mnemonic_mov == mnemonic) {
         int rd;
         if((i = parse_register(s, &rd)) < 0) {
             return 0;
@@ -136,7 +137,6 @@ static int asm_one(const char *s, int *out_word) {
         }
 
     }
-
     return 0;
 }
 

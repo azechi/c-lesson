@@ -1,6 +1,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "substring.h"
 
 typedef enum ParseError_ {
     /* SUCCESS >= 0 */
@@ -8,12 +9,6 @@ typedef enum ParseError_ {
     PARSE_FAILURE = -2
 } ParseError;
 
-typedef struct Substring_ {
-    const char *str;
-    int len;
-} Substring;
-
-int str_eq_subs(const char *s, const Substring *subs);
 
 int parse_one(const char *s, Substring *out_subs);
 int parse_register(const char *s, int *out_register);

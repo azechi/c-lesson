@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
 
     char bin[100*1024];
     Emitter emitter = {.buf = bin, .pos = 0};
-    init_symbol();
+    prepare_mnemonic_symbol();
     if(!assemble(&emitter)) {
         return 1;
     }

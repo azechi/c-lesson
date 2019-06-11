@@ -4,140 +4,132 @@
 #include "cl_getline.h"
 #include "parser.h"
 #include "symbol.h"
+#include "label_dictionary.h"
 #include "assembler.h"
+
 
 #define assert_fail(msg) assert(0&&(msg))
 
-static int asm_one(const char *s, int *out_word);
-static void emit_word(Emitter *emitter, int oneword);
+typedef enum AssembleState_ {
+    ASM_ERROR,
+    ASM_INST,
+    ASM_LABEL,
+    ASM_BLANK
+} AssembleState;
 
+static AssembleState asm_one(const char *s, int *out_word);
+static void emit_word(Emitter *emitter, int oneword);
 
 
 int assemble(Emitter *emitter) {
     char *str;
     while(cl_getline(&str) >= 0) {
         int word;
-        if(!asm_one(str, &word)) {
-            return 0;
-        }
-
-        /* skip empty line, empty word */
-        if(word) {
-            emit_word(emitter, word);
+        switch(asm_one(str, &word)) {
+            case ASM_INST:
+                emit_word(emitter, word);
+                break;
+            case ASM_LABEL:
+                label_dict_put(word, emitter->pos);
+                break;
+            case ASM_BLANK:
+                break;
+            case ASM_ERROR:
+            default:
+                return 0;
         }
     }
     return 1;
 }
 
-static int asm_one(const char *s, int *out_word) {
+static AssembleState asm_one(const char *s, int *out_word) {
 
-    int i;
-    Substring subs = {0};
-    i = parse_one(s, &subs);
-    if(i == PARSE_FAILURE) {
-        return 0;
-    }
-    if(i == PARSE_EOF) {
-        *out_word = 0;
-        return 1;
+    if(follows_eof(s)) {
+        /* blank line */
+        return ASM_BLANK;
     }
 
-    s += i;
+    Substring one = {0};
+    if(!parse_one(&s, &one)) {
+        return ASM_ERROR;
+    }
 
-    int mnemonic = to_mnemonic_symbol(&subs);
+    if(one_is_label(&one)) {
+        if(find_label_symbol(&one)) {
+            /* duplicate label */
+            return ASM_ERROR;
+        }
+
+        *out_word = to_label_symbol(&one);
+        return ASM_LABEL;
+    }
+
+    int mnemonic = to_mnemonic_symbol(&one);
     if(mnemonic == mnemonic_raw) {
         int word;
-        if((i = parse_raw_word(s, &word)) < 0) {
-            return 0;
+        if(parse_raw_word(&s, &word) && follows_eof(s)) {
+            *out_word = word;
+            return ASM_INST;
         }
-        *out_word = word;
-        return 1;
     } else if(mnemonic_ldr == mnemonic || mnemonic_str == mnemonic) {
-        int l_bit = str_eq_subs("ldr", &subs)? 0x00100000: 0;
+        int l_bit = str_eq_subs("ldr", &one)? 0x00100000: 0;
 
-        int rd;
-        if((i = parse_register(s, &rd)) < 0) {
-            return 0;
-        }
-        s += i;
+        int rd, rn;
+        if(parse_register(&s, &rd)
+            && skip_comma(&s)
+            && skip_sbracket_open(&s)
+            && parse_register(&s, &rn)) {
 
-        if((i = skip_comma(s)) < 0) {
-            return 0;
-        }
-        s += i;
+            if(follows_sbracket_close(s)) {
+                if(skip_sbracket_close(&s)
+                    && follows_eof(s)) {
 
-        if((i = skip_sbracket_open(s)) < 0) {
-            return 0;
-        }
-        s += i;
+                    *out_word = 0xE5800000 + l_bit + (rn << 16) + (rd << 12);
+                    return ASM_INST;
+                }
+            } else {
+                int offset;
+                if(skip_comma(&s)
+                    && parse_immediate(&s, &offset)
+                    && skip_sbracket_close(&s)
+                    && follows_eof(s)) {
 
-        int rn;
-        if((i = parse_register(s, &rn)) < 0) {
-            return 0;
-        }
-        s += i;
-
-        if(is_sbracket_close(s)) {
-            if((i = skip_sbracket_close(s)) < 0) {
-                return 0;
+                    int u_bit = (offset < 0)? 0: 0x00800000;
+                    *out_word = 0xE5000000 + l_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF);
+                    return ASM_INST;
+                }
             }
-            s += i;
-            *out_word = 0xE5800000 + l_bit + (rn << 16) + (rd << 12);
-            return 1;
         }
-
-        if((i = skip_comma(s)) < 0) {
-            return 0;
-        }
-        s += i;
-
-        int offset;
-        if((i = parse_immediate(s, &offset)) < 0) {
-            return 0;
-        }
-        s += i;
-
-        int u_bit = (offset < 0)? 0: 0x00800000;
-
-        *out_word = 0xE5000000 + l_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF);
-        return 1;
     } else if(mnemonic_mov == mnemonic) {
         int rd;
-        if((i = parse_register(s, &rd)) < 0) {
-            return 0;
-        }
-        s += i;
+        if(parse_register(&s, &rd)
+            && skip_comma(&s)) {
 
-        if((i = skip_comma(s)) < 0) {
-            return 0;
-        }
-        s += i;
+            if(follows_register(s)) {
+                int rm;
+                if(parse_register(&s, &rm)
+                    && follows_eof(s)) {
+                    *out_word = 0xE1A00000 + (rd << 12) + rm;
+                    return ASM_INST;
+                }
+            } else {
+                int imm;
+                if(parse_immediate(&s, &imm)
+                    && follows_eof(s)) {
+                    /* not implement 4bit rotate. only 8 bit immediate value is supported*/
+                    if(imm < 0 || 0xFF < imm) {
+                        return ASM_ERROR;
+                    }
 
-        if(is_register(s)) {
-            int rm;
-            if((i = parse_register(s, &rm)) < 0) {
-                return 0;
+                    *out_word = 0xE3A00000 + (rd << 12) + imm;
+                    return ASM_INST;
+                }
             }
-
-            *out_word = 0xE1A00000 + (rd << 12) + rm;
-            return 1;
-        } else {
-            int imm;
-            if((i = parse_immediate(s, &imm)) < 0) {
-                return 0;
-            }
-
-            /* not implement 4bit rotate. only 8 bit immediate value is supported*/
-            if(imm < 0 || 0xFF < imm) {
-                return 0;
-            }
-
-            *out_word = 0xE3A00000 + (rd << 12) + imm;
-            return 1;
         }
-
     }
-    return 0;
+
+
+    return ASM_ERROR;
 }
 
 static void emit_word(Emitter *emitter, int word) {
@@ -167,6 +159,7 @@ void assembler_test() {
     verify_asm_one("ldr r1, [r15, #-0x30]", 0xE51F1030);
     verify_asm_one("ldr r1, [r15]", 0xE59F1000);
     verify_asm_one("str r0, [r1]", 0xE5810000);
-}
 
+    verify_asm_one("loop: ", 0x00010001);
+}
 

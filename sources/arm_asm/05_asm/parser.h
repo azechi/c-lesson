@@ -3,24 +3,24 @@
 
 #include "substring.h"
 
-typedef enum ParseError_ {
-    /* SUCCESS >= 0 */
-    PARSE_EOF = -1,
-    PARSE_FAILURE = -2
-} ParseError;
+/* return value is boolean */
+int parse_one(char const **s, Substring *out_subs);
+int parse_register(char const **s, int *out_register);
+int parse_raw_word(char const **s, int *out_word);
+int parse_immediate(char const **s, int *out_immediate);
 
+/* return value is boolean */
+int skip_comma(char const **s);
+int skip_sbracket_open(char const **s);
+int skip_sbracket_close(char const **s);
 
-int parse_one(const char *s, Substring *out_subs);
-int parse_register(const char *s, int *out_register);
-int parse_immediate(const char *s, int *out_immediate);
-int parse_raw_word(const char *s, int *out_word);
-int skip_comma(const char *s);
-int skip_sbracket_open(const char *s);
-int skip_sbracket_close(const char *s);
+/* return value is boolean */
+int one_is_label(const Substring *subs);
 
-int is_register(const char *s);
-int is_sbracket_close(const char *s);
-
+/* return value is boolean */
+int follows_eof(const char *s);
+int follows_register(const char *s);
+int follows_sbracket_close(const char *s);
 
 void parser_test();
 

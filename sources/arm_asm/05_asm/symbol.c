@@ -12,7 +12,7 @@ int mnemonic_str;
 
 static int string_to_mnemonic_symbol(const char *s);
 
-void init_symbol() {
+void prepare_mnemonic_symbol() {
     mnemonic_mov = string_to_mnemonic_symbol("mov");
     mnemonic_raw = string_to_mnemonic_symbol(".raw");
     mnemonic_ldr = string_to_mnemonic_symbol("ldr");
@@ -33,13 +33,39 @@ typedef struct Node_ {
 } Node;
 
 static Node *mnemonic_root = NULL;
-int mnemonic_value = 1;
-/*
 static Node *label_root = NULL;
-int label_value =10000;
-*/
+int mnemonic_value = 1;
+int label_value = 0x00010001;
+
+static Node **find(Node **root, const Substring *s);
 static Node *insert(Node **root, const Substring *s);
 
+
+void clear_mnemonic_symbol() {
+    mnemonic_root = NULL;
+    /* TODO free Node */
+}
+
+void clear_label_symbol() {
+    label_root = NULL;
+    /* TODO free Node */
+}
+
+int find_label_symbol(const Substring *s) {
+    Node *node = *find(&label_root, s);
+    if(node) {
+        return node->value;
+    }
+    return 0;
+}
+
+int to_label_symbol(const Substring *s) {
+    Node *node = insert(&label_root, s);
+    if(node->value == 0) {
+        node->value = label_value++;
+    }
+    return node->value;
+}
 
 int to_mnemonic_symbol(const Substring *s) {
     Node *node = insert(&mnemonic_root, s);
@@ -49,28 +75,36 @@ int to_mnemonic_symbol(const Substring *s) {
     return node->value;
 }
 
-static Node *insert(Node **root, const Substring *s) {
+static Node **find(Node **root, const Substring *s) {
     while(*root) {
         int cmp = str_cmp_subs((*root)->id, s);
         if(cmp == 0) {
-            return *root;
-        }else if(cmp < 0) {
+            return root;
+        } else if(cmp < 0) {
             root = &(*root)->left;
         } else {
             root = &(*root)->right;
         }
     }
+    return root;
+}
 
-    char *id = malloc(sizeof(s->len) + 1);
-    strncpy(id, s->str, s->len + 1);
+static Node *insert(Node **root, const Substring *s) {
+    root = find(root, s);
 
-    Node *node = malloc(sizeof(Node));
-    node->id = id;
-    node->value = 0;
-    node->left = node->right = NULL;
+    if(*root == NULL) {
+        char *id = malloc(sizeof(s->len) + 1);
+        strncpy(id, s->str, s->len + 1);
 
-    *root = node;
-    return node;
+        Node *node = malloc(sizeof(Node));
+        node->id = id;
+        node->value = 0;
+        node->left = node->right = NULL;
+
+        *root = node;
+    }
+
+    return *root;
 }
 
 
@@ -87,7 +121,7 @@ static void verify_to_mnemonic_symbol_not_match(char *input, int expect) {
 }
 
 void symbol_test() {
-    init_symbol();
+    prepare_mnemonic_symbol();
     verify_to_mnemonic_symbol("mov", mnemonic_mov);
     verify_to_mnemonic_symbol("mov", mnemonic_mov);
     verify_to_mnemonic_symbol(".raw", mnemonic_raw);

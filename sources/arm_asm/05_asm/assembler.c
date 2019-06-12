@@ -78,7 +78,7 @@ static void asm_address(LabelAddressReference *lr, int *out_word) {
     int offset;
     switch(lr->flag) {
         case 24:
-            offset = dest - lr->address - 8;
+            offset = (dest - lr->address - 8) >> 2;
             *out_word = 0x00FFFFFF & offset;
             return;
         default:

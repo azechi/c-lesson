@@ -26,10 +26,10 @@ static int label_dict_find_index(int symbol) {
 void label_dict_put(int symbol, int pos) {
     int idx = label_dict_find_index(symbol);
     if(idx == -1) {
-        label_dict_array[label_dict_pos++].symbol = symbol;
-        return;
+        idx = label_dict_pos++;
     }
     label_dict_array[idx].symbol = symbol;
+    label_dict_array[idx].pos = pos;
 }
 
 

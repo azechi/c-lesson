@@ -17,16 +17,19 @@ typedef struct LableAddressReference_ {
     struct LableAddressReference_ *next;
 } LabelAddressReference;
 
-static LabelAddressReference *head;
+static LabelAddressReference *head = NULL;
 
 
 static void label_address_reference_push(LabelAddressReference *r) {
-    while(head) {
-        head = head->next;
+    LabelAddressReference *h = head;
+    while(h) {
+        h = h->next;
     }
 
-    head = malloc(sizeof(*head));
-    *head = *r;
+    h = malloc(sizeof(*head));
+    *h = *r;
+    h->next = head;
+    head = h;
 }
 
 static int label_address_reference_pop(LabelAddressReference *out_r) {
@@ -35,8 +38,10 @@ static int label_address_reference_pop(LabelAddressReference *out_r) {
     }
 
     *out_r = *head;
-    free(head);
+
+    LabelAddressReference *tmp = head;
     head = head->next;
+    free(tmp);;
     return 1;
 }
 
@@ -201,7 +206,7 @@ static void patch_word(Emitter *emitter, int address ,int word) {
 /* unit test */
 static void test_b_label() {
     char *input = "b label";
-    int expect_word = 0x7FFFFFFF;
+    int expect_word = 0xEA000000;
     LabelAddressReference expect_ref= {
         .address = 0,
         .label = 10001,
@@ -221,10 +226,25 @@ static void test_b_label() {
     assert(eq);
 }
 
+void test_label_address_reference() {
+    head = NULL;
+    LabelAddressReference lr = {.label = -1};
+    label_address_reference_push(&lr);
+    lr.label = 2;
+    label_address_reference_push(&lr);
+
+    label_address_reference_pop(&lr);
+    assert(2 == lr.label);
+    label_address_reference_pop(&lr);
+    assert(-1 == lr.label);
+}
+
 
 void assembler_test() {
 
     test_b_label();
+
+    test_label_address_reference();
 
     /*
     verify_asm_one_inst("mov r1, r2", 0xE1A01002);

@@ -30,6 +30,16 @@ int parse_one(char const **s, Substring *out_subs) {
     return 1;
 }
 
+int parse_label(char const **s, Substring *out_subs) {
+    try_skip(s, is_space);
+
+    int len = look_ahead(*s, isalpha);
+    out_subs->str = *s;
+    out_subs->len = len;
+    *s += len;
+    return 1;
+}
+
 int parse_register(char const **s, int *out_register) {
     try_skip(s, is_space);
     if(!try_skip_char(s, 'r')) {

@@ -1,4 +1,5 @@
-#include "label_dictionary.h"
+#include <stdlib.h>
+#include "label.h"
 
 
 typedef struct LabelDictEntry_ {
@@ -25,10 +26,10 @@ static int label_dict_find_index(int symbol) {
 void label_dict_put(int symbol, int pos) {
     int idx = label_dict_find_index(symbol);
     if(idx == -1) {
-        label_dict_array[label_dict_pos++].pos = pos;
+        label_dict_array[label_dict_pos++].symbol = symbol;
         return;
     }
-    label_dict_array[idx].pos = pos;
+    label_dict_array[idx].symbol = symbol;
 }
 
 
@@ -40,5 +41,4 @@ int label_dict_get(int symbol, int *out_pos) {
     *out_pos = label_dict_array[idx].pos;
     return 1;
 }
-
 

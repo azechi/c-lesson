@@ -1,67 +1,106 @@
 #include <assert.h>
 #include <stdlib.h>
-
 #include "cl_getline.h"
 #include "parser.h"
 #include "symbol.h"
-#include "label_dictionary.h"
+#include "label.h"
 #include "assembler.h"
 
 
 #define assert_fail(msg) assert(0&&(msg))
 
-typedef enum AssembleState_ {
-    ASM_ERROR,
-    ASM_INST,
-    ASM_LABEL,
-    ASM_BLANK
-} AssembleState;
 
-static AssembleState asm_one(const char *s, int *out_word);
-static void emit_word(Emitter *emitter, int oneword);
+typedef struct LableAddressReference_ {
+    int address;
+    int label;
+    int flag;
+    struct LableAddressReference_ *next;
+} LabelAddressReference;
 
+static LabelAddressReference *head;
+
+
+static void label_address_reference_push(LabelAddressReference *r) {
+    while(head) {
+        head = head->next;
+    }
+
+    head = malloc(sizeof(*head));
+    *head = *r;
+}
+
+static int label_address_reference_pop(LabelAddressReference *out_r) {
+    if(!head) {
+        return 0;
+    }
+
+    *out_r = *head;
+    free(head);
+    head = head->next;
+    return 1;
+}
+
+static int asm_one(const char *s, int address, int *out_word);
+static void asm_address(LabelAddressReference *lr, int *out_word);
+static void emit_word(Emitter *emitter, int word);
+static void patch_word(Emitter *emitter, int address ,int word);
 
 int assemble(Emitter *emitter) {
     char *str;
     while(cl_getline(&str) >= 0) {
-        int word;
-        switch(asm_one(str, &word)) {
-            case ASM_INST:
-                emit_word(emitter, word);
-                break;
-            case ASM_LABEL:
-                label_dict_put(word, emitter->pos);
-                break;
-            case ASM_BLANK:
-                break;
-            case ASM_ERROR:
-            default:
-                return 0;
+        int word = 0;
+        if(asm_one(str, emitter->pos, &word)) {
+            emit_word(emitter, word);
         }
     }
+
+    LabelAddressReference lr;
+    while(label_address_reference_pop(&lr)) {
+        int word = 0;
+        asm_address(&lr, &word);
+        patch_word(emitter, lr.address, word);
+    }
+
     return 1;
 }
 
-static AssembleState asm_one(const char *s, int *out_word) {
+static void asm_address(LabelAddressReference *lr, int *out_word) {
+    int dest;
+    if(!label_dict_get(lr->label, &dest)){
+        assert_fail("UNKNOWN LABEL");
+    }
+
+    int offset;
+    switch(lr->flag) {
+        case 24:
+            offset = dest - lr->address - 8;
+            *out_word = 0x00FFFFFF & offset;
+            return;
+        default:
+            assert("NOT IMPLEMENTED");
+    }
+}
+
+static int asm_one(const char *s, int address, int *out_word) {
 
     if(follows_eof(s)) {
         /* blank line */
-        return ASM_BLANK;
+        return 0;
     }
 
     Substring one = {0};
     if(!parse_one(&s, &one)) {
-        return ASM_ERROR;
+        assert_fail("UNKNOWN ASSEMBLY");
     }
 
     if(one_is_label(&one)) {
         if(find_label_symbol(&one)) {
-            /* duplicate label */
-            return ASM_ERROR;
+            assert_fail("DUPLICATE LABEL");
         }
 
-        *out_word = to_label_symbol(&one);
-        return ASM_LABEL;
+        int label = to_label_symbol(&one);
+        label_dict_put(label, address);
+        return 0;
     }
 
     int mnemonic = to_mnemonic_symbol(&one);
@@ -69,7 +108,19 @@ static AssembleState asm_one(const char *s, int *out_word) {
         int word;
         if(parse_raw_word(&s, &word) && follows_eof(s)) {
             *out_word = word;
-            return ASM_INST;
+            return 1;
+        }
+    } else if(mnemonic_b == mnemonic) {
+        Substring subs = {0};
+        if(parse_label(&s, &subs) && follows_eof(s)) {
+            LabelAddressReference r = {
+                .address = address,
+                .label = to_label_symbol(&subs),
+                .flag = 24,
+            };
+            label_address_reference_push(&r);
+            *out_word = 0xEA000000;
+            return 1;
         }
     } else if(mnemonic_ldr == mnemonic || mnemonic_str == mnemonic) {
         int l_bit = str_eq_subs("ldr", &one)? 0x00100000: 0;
@@ -85,7 +136,7 @@ static AssembleState asm_one(const char *s, int *out_word) {
                     && follows_eof(s)) {
 
                     *out_word = 0xE5800000 + l_bit + (rn << 16) + (rd << 12);
-                    return ASM_INST;
+                    return 1;
                 }
             } else {
                 int offset;
@@ -96,7 +147,7 @@ static AssembleState asm_one(const char *s, int *out_word) {
 
                     int u_bit = (offset < 0)? 0: 0x00800000;
                     *out_word = 0xE5000000 + l_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF);
-                    return ASM_INST;
+                    return 1;
                 }
             }
         }
@@ -110,7 +161,7 @@ static AssembleState asm_one(const char *s, int *out_word) {
                 if(parse_register(&s, &rm)
                     && follows_eof(s)) {
                     *out_word = 0xE1A00000 + (rd << 12) + rm;
-                    return ASM_INST;
+                    return 1;
                 }
             } else {
                 int imm;
@@ -118,18 +169,18 @@ static AssembleState asm_one(const char *s, int *out_word) {
                     && follows_eof(s)) {
                     /* not implement 4bit rotate. only 8 bit immediate value is supported*/
                     if(imm < 0 || 0xFF < imm) {
-                        return ASM_ERROR;
+                        assert_fail("INVALID REGISTER NUMBER");
                     }
 
                     *out_word = 0xE3A00000 + (rd << 12) + imm;
-                    return ASM_INST;
+                    return 1;
                 }
             }
         }
     }
 
 
-    return ASM_ERROR;
+    assert_fail("UNKNOWN ASSEMBLY");
 }
 
 static void emit_word(Emitter *emitter, int word) {
@@ -139,27 +190,54 @@ static void emit_word(Emitter *emitter, int word) {
     emitter->buf[emitter->pos++] = word >> 24 & 0xFF;
 }
 
-/* unit test */
-static void verify_asm_one(const char *input, int expect) {
-    int actual;
-    int success = asm_one(input, &actual);
-    assert(success);
-    assert(expect == actual);
+static void patch_word(Emitter *emitter, int address ,int word) {
+    emitter->buf[address++] |= word & 0xFF;
+    emitter->buf[address++] |= word >> 8 & 0xFF;
+    emitter->buf[address++] |= word >> 16 & 0xFF;
+    emitter->buf[address++] |= word >> 24 & 0xFF;
 }
 
+
+/* unit test */
+static void test_b_label() {
+    char *input = "b label";
+    int expect_word = 0x7FFFFFFF;
+    LabelAddressReference expect_ref= {
+        .address = 0,
+        .label = 10001,
+        .flag = 24
+    };
+
+    int word;
+    int success = asm_one(input, 0, &word);
+    assert(success);
+    assert(expect_word == word);
+
+    LabelAddressReference actual = *head;
+    int eq = expect_ref.address == actual.address
+        && expect_ref.label == actual.label
+        && expect_ref.flag == actual.flag;
+
+    assert(eq);
+}
+
+
 void assembler_test() {
-    verify_asm_one("mov r1, r2", 0xE1A01002);
-    verify_asm_one(" mov r15 ,  r0  ", 0xE1A0F000);
-    verify_asm_one("mov r1, #0x68", 0xE3A01068);
 
-    verify_asm_one(".raw 0x12345678", 0x12345678);
-    verify_asm_one(".raw 0x80000001", 0x80000001);
+    test_b_label();
 
-    verify_asm_one("ldr r1, [r15, #0x30]", 0xE59F1030);
-    verify_asm_one("ldr r1, [r15, #-0x30]", 0xE51F1030);
-    verify_asm_one("ldr r1, [r15]", 0xE59F1000);
-    verify_asm_one("str r0, [r1]", 0xE5810000);
+    /*
+    verify_asm_one_inst("mov r1, r2", 0xE1A01002);
+    verify_asm_one_inst(" mov r15 ,  r0  ", 0xE1A0F000);
+    verify_asm_one_inst("mov r1, #0x68", 0xE3A01068);
 
-    verify_asm_one("loop: ", 0x00010001);
+    verify_asm_one_inst(".raw 0x12345678", 0x12345678);
+    verify_asm_one_inst(".raw 0x80000001", 0x80000001);
+
+    verify_asm_one_inst("ldr r1, [r15, #0x30]", 0xE59F1030);
+    verify_asm_one_inst("ldr r1, [r15, #-0x30]", 0xE51F1030);
+    verify_asm_one_inst("ldr r1, [r15]", 0xE59F1000);
+    verify_asm_one_inst("str r0, [r1]", 0xE5810000);
+    */
 }
 

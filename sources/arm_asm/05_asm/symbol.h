@@ -9,7 +9,7 @@ extern int mnemonic_mov;
 extern int mnemonic_raw;
 extern int mnemonic_ldr;
 extern int mnemonic_str;
-
+extern int mnemonic_b;
 
 void prepare_mnemonic_symbol();
 

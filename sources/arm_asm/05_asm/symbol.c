@@ -9,6 +9,7 @@ int mnemonic_mov;
 int mnemonic_raw;
 int mnemonic_ldr;
 int mnemonic_str;
+int mnemonic_b;
 
 static int string_to_mnemonic_symbol(const char *s);
 
@@ -17,6 +18,7 @@ void prepare_mnemonic_symbol() {
     mnemonic_raw = string_to_mnemonic_symbol(".raw");
     mnemonic_ldr = string_to_mnemonic_symbol("ldr");
     mnemonic_str = string_to_mnemonic_symbol("str");
+    mnemonic_b = string_to_mnemonic_symbol("b");
 }
 
 static int string_to_mnemonic_symbol(const char *s) {
@@ -35,7 +37,7 @@ typedef struct Node_ {
 static Node *mnemonic_root = NULL;
 static Node *label_root = NULL;
 int mnemonic_value = 1;
-int label_value = 0x00010001;
+int label_value = 10001;
 
 static Node **find(Node **root, const Substring *s);
 static Node *insert(Node **root, const Substring *s);
@@ -93,8 +95,10 @@ static Node *insert(Node **root, const Substring *s) {
     root = find(root, s);
 
     if(*root == NULL) {
-        char *id = malloc(sizeof(s->len) + 1);
-        strncpy(id, s->str, s->len + 1);
+        int size = s->len;
+        char *id = malloc(size + 1);
+        strncpy(id, s->str, size);
+        id[size] = '\0';
 
         Node *node = malloc(sizeof(Node));
         node->id = id;

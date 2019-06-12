@@ -1,5 +1,8 @@
+#include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
+#include "cl_utils.h"
 
 static char buf[100*1024];
 
@@ -33,17 +36,36 @@ void cl_disable_buffer_mode() {
 }
 
 
+static void printf_va(const char *fmt, va_list arg_ptr);
+
+void cl_printfn(const char *fmt, ...) {
+    va_list arg_ptr;
+    va_start(arg_ptr, fmt);
+
+    int len = strlen(fmt) + 1 + strlen("\n");
+    char buff[len];
+    sprintf(buff, "%s\n", fmt);
+    printf_va(buff, arg_ptr);
+
+    va_end(arg_ptr);
+}
+
 void cl_printf(char *fmt, ...) {
     va_list arg_ptr;
     va_start(arg_ptr, fmt);
 
+    printf_va(fmt, arg_ptr);
+
+    va_end(arg_ptr);
+}
+
+
+static void printf_va(const char *fmt, va_list arg_ptr) {
     if(to_buffer) {
         pos += vsprintf(&buf[pos], fmt, arg_ptr);
         pos++;
     } else {
         vprintf(fmt, arg_ptr);
     }
-    va_end(arg_ptr);
 }
-
 

@@ -1,13 +1,17 @@
 #include <stdio.h>
 #include "cl_getline.h"
-#include "symbol.h"
 #include "assembler.h"
-#include "parser.h"
+
+void cl_getline_test();
+void symbol_test();
+void parser_test();
+void assembler_test();
 
 
 int main(int argc, char *argv[]) {
 
     if(argc <= 1) {
+        cl_getline_test();
         symbol_test();
         parser_test();
         assembler_test();
@@ -20,12 +24,7 @@ int main(int argc, char *argv[]) {
     }
 
     char bin[100*1024];
-    Emitter emitter = {.buf = bin, .pos = 0};
-    prepare_mnemonic_symbol();
-    if(!assemble(&emitter)) {
-        return 1;
-    }
-
-    fwrite(emitter.buf, sizeof(char), emitter.pos, stdout);
+    int len = assemble(bin);
+    fwrite(bin, 1, len, stdout);
 }
 

@@ -23,6 +23,5 @@ int follows_eof(const char *s);
 int follows_register(const char *s);
 int follows_sbracket_close(const char *s);
 
-void parser_test();
 
 #endif

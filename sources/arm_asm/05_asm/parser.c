@@ -9,7 +9,7 @@ typedef int (*Predicate_char)(int c);
 static int look_ahead(const char *s, Predicate_char pred);
 static int try_skip(char const **s, Predicate_char pred);
 static int try_skip_1(char const **s, Predicate_char pred);
-static int try_skip_char(char const **s, char c);
+static int try_skip_1_char(char const **s, char c);
 
 static int is_space(int c);
 static int is_one_first(int c);
@@ -42,7 +42,7 @@ int parse_label(char const **s, Substring *out_subs) {
 
 int parse_register(char const **s, int *out_register) {
     try_skip(s, is_space);
-    if(!try_skip_char(s, 'r')) {
+    if(!try_skip_1_char(s, 'r')) {
         return 0;
     }
 
@@ -68,7 +68,7 @@ int parse_register(char const **s, int *out_register) {
 int parse_raw_word(char const **s, int *out_word) {
     try_skip(s, is_space);
 
-    if(!try_skip_char(s, '0') || !try_skip_char(s, 'x')) {
+    if(!try_skip_1_char(s, '0') || !try_skip_1_char(s, 'x')) {
         return 0;
     }
 
@@ -96,13 +96,13 @@ int parse_raw_word(char const **s, int *out_word) {
 int parse_immediate(char const **s, int *out_immediate) {
     try_skip(s, is_space);
 
-    if(!try_skip_char(s, '#')) {
+    if(!try_skip_1_char(s, '#')) {
         return 0;
     }
 
-    int sign = try_skip_char(s, '-')? -1: 1;
+    int sign = try_skip_1_char(s, '-')? -1: 1;
 
-    if(!try_skip_char(s, '0') || !try_skip_char(s, 'x')) {
+    if(!try_skip_1_char(s, '0') || !try_skip_1_char(s, 'x')) {
         return 0;
     }
 
@@ -129,39 +129,39 @@ int parse_immediate(char const **s, int *out_immediate) {
 
 int skip_comma(char const **s) {
     try_skip(s, is_space);
-    return try_skip_char(s, ',');
+    return try_skip_1_char(s, ',');
 }
 
 int skip_sbracket_open(char const **s) {
     try_skip(s, is_space);
-    return try_skip_char(s, '[');
+    return try_skip_1_char(s, '[');
 }
 
 int skip_sbracket_close(char const **s) {
     try_skip(s, is_space);
-    return try_skip_char(s, ']');
+    return try_skip_1_char(s, ']');
 }
 
 int one_is_label(const Substring *subs) {
     const char *s = subs->str + subs->len;
-    return try_skip_char(&s, ':') && follows_eof(s);
+    return try_skip_1_char(&s, ':') && follows_eof(s);
 }
 
 int follows_eof(const char *s) {
     try_skip(&s, is_space);
-    return try_skip_char(&s, '\0');
+    return try_skip_1_char(&s, '\0');
 }
 
 int follows_register(const char *s) {
     try_skip(&s, is_space);
-    return try_skip_char(&s, 'r')
+    return try_skip_1_char(&s, 'r')
         && try_skip(&s, isdigit)
         && try_skip_1(&s, is_register_trailing);
 }
 
 int follows_sbracket_close(const char *s) {
     try_skip(&s, is_space);
-    return try_skip_char(&s, ']');
+    return try_skip_1_char(&s, ']');
 }
 
 
@@ -190,7 +190,7 @@ static int try_skip_1(char const **s, Predicate_char pred) {
     return 1;
 }
 
-static int try_skip_char(char const **s, char c) {
+static int try_skip_1_char(char const **s, char c) {
     if(tolower(**s) != c) {
         return 0;
     }

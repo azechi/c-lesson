@@ -3,28 +3,8 @@
 #include <stdlib.h>
 
 #include "substring.h"
-#include "symbol.h"
+#include "assembler_symbol_dict.h"
 
-int mnemonic_mov;
-int mnemonic_raw;
-int mnemonic_ldr;
-int mnemonic_str;
-int mnemonic_b;
-
-static int string_to_mnemonic_symbol(const char *s);
-
-void prepare_mnemonic_symbol() {
-    mnemonic_mov = string_to_mnemonic_symbol("mov");
-    mnemonic_raw = string_to_mnemonic_symbol(".raw");
-    mnemonic_ldr = string_to_mnemonic_symbol("ldr");
-    mnemonic_str = string_to_mnemonic_symbol("str");
-    mnemonic_b = string_to_mnemonic_symbol("b");
-}
-
-static int string_to_mnemonic_symbol(const char *s) {
-    Substring subs = {.str = s, .len = strlen(s)};
-    return to_mnemonic_symbol(&subs);
-}
 
 /* binary search tree  */
 typedef struct Node_ {
@@ -43,12 +23,12 @@ static Node **find(Node **root, const Substring *s);
 static Node *insert(Node **root, const Substring *s);
 
 
-void clear_mnemonic_symbol() {
+void mnemonic_symbol_clear() {
     mnemonic_root = NULL;
     /* TODO free Node */
 }
 
-void clear_label_symbol() {
+void label_symbol_clear() {
     label_root = NULL;
     /* TODO free Node */
 }
@@ -112,23 +92,29 @@ static Node *insert(Node **root, const Substring *s) {
 }
 
 
-static void verify_to_mnemonic_symbol(char *input, int expect) {
-    Substring subs = {.str = input, .len = strlen(input)};
-    int actual = to_mnemonic_symbol(&subs);
-    assert(expect == actual);
+static void verify_to_mnemonic_symbol(char *input, char *expect) {
+    mnemonic_symbol_clear();
+    Substring input_subs = {.str = input, .len = strlen(input)};
+    Substring expect_subs = {.str = expect, .len = strlen(expect)};
+    int actual = to_mnemonic_symbol(&input_subs);
+    int eq = to_mnemonic_symbol(&expect_subs) == actual;
+
+    assert(eq);
 }
 
-static void verify_to_mnemonic_symbol_not_match(char *input, int expect) {
-    Substring subs = {.str = input, .len = strlen(input)};
-    int actual = to_mnemonic_symbol(&subs);
-    assert(expect != actual);
+static void verify_to_mnemonic_symbol_not_match(char *input, char  *expect) {
+    mnemonic_symbol_clear();
+    Substring input_subs = {.str = input, .len = strlen(input)};
+    Substring expect_subs = {.str = expect, .len = strlen(expect)};
+    int actual = to_mnemonic_symbol(&input_subs);
+    int eq = to_mnemonic_symbol(&expect_subs) == actual;
+
+    assert(!eq);
 }
 
 void symbol_test() {
-    prepare_mnemonic_symbol();
-    verify_to_mnemonic_symbol("mov", mnemonic_mov);
-    verify_to_mnemonic_symbol("mov", mnemonic_mov);
-    verify_to_mnemonic_symbol(".raw", mnemonic_raw);
-    verify_to_mnemonic_symbol_not_match("mo", mnemonic_mov);
-    verify_to_mnemonic_symbol_not_match("move", mnemonic_mov);
+    verify_to_mnemonic_symbol("mov", "mov");
+    verify_to_mnemonic_symbol(".raw", ".raw");
+    verify_to_mnemonic_symbol_not_match("mo", "mov");
+    verify_to_mnemonic_symbol_not_match("move", "mov");
 }

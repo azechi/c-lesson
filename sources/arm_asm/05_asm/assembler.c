@@ -2,74 +2,51 @@
 #include <stdlib.h>
 #include "cl_getline.h"
 #include "parser.h"
-#include "symbol.h"
-#include "label.h"
+#include "assembler_symbol_dict.h"
 #include "assembler.h"
+#include "assembler_emitter.h"
+#include "assembler_label_dict.h"
+#include "assembler_private.h"
+#include "assembler_unresolve_address_list.h"
 
+#include <string.h>
 
 #define assert_fail(msg) assert(0&&(msg))
 
 
-typedef struct LableAddressReference_ {
-    int address;
-    int label;
-    int flag;
-    struct LableAddressReference_ *next;
-} LabelAddressReference;
-
-static LabelAddressReference *head = NULL;
+int MOV;
+int RAW;
+int LDR;
+int STR;
+int B;
 
 
-static void label_address_reference_push(LabelAddressReference *r) {
-    LabelAddressReference *h = head;
-    while(h) {
-        h = h->next;
-    }
+static void prepare_mnemonic_symbol();
+static void asm_one(Emitter *emitter, const char *s);
+static void asm_address(UnresolveAddress *lr, int *out_word);
 
-    h = malloc(sizeof(*head));
-    *h = *r;
-    h->next = head;
-    head = h;
-}
-
-static int label_address_reference_pop(LabelAddressReference *out_r) {
-    if(!head) {
-        return 0;
-    }
-
-    *out_r = *head;
-
-    LabelAddressReference *tmp = head;
-    head = head->next;
-    free(tmp);;
-    return 1;
-}
-
-static int asm_one(const char *s, int address, int *out_word);
-static void asm_address(LabelAddressReference *lr, int *out_word);
-static void emit_word(Emitter *emitter, int word);
-static void patch_word(Emitter *emitter, int address ,int word);
-
-int assemble(Emitter *emitter) {
+int assemble(char *const bin) {
+    Emitter *emitter = emitter_new(bin);
+    prepare_mnemonic_symbol();
     char *str;
     while(cl_getline(&str) >= 0) {
-        int word = 0;
-        if(asm_one(str, emitter->pos, &word)) {
-            emit_word(emitter, word);
-        }
+        asm_one(emitter, str);
     }
 
-    LabelAddressReference lr;
-    while(label_address_reference_pop(&lr)) {
+    UnresolveAddress lr;
+    while(unresolve_address_pop(&lr)) {
         int word = 0;
         asm_address(&lr, &word);
-        patch_word(emitter, lr.address, word);
+        emitter_patch_word(emitter, lr.address, word);
     }
 
-    return 1;
+    int len = emitter_current_address(emitter);
+    emitter_free(emitter);
+    return len;
 }
 
-static void asm_address(LabelAddressReference *lr, int *out_word) {
+
+static void asm_address(UnresolveAddress *lr, int *out_word) {
     int dest;
     if(!label_dict_get(lr->label, &dest)){
         assert_fail("UNKNOWN LABEL");
@@ -86,11 +63,11 @@ static void asm_address(LabelAddressReference *lr, int *out_word) {
     }
 }
 
-static int asm_one(const char *s, int address, int *out_word) {
+static void asm_one(Emitter *emitter, const char *s) {
 
     if(follows_eof(s)) {
         /* blank line */
-        return 0;
+        return;
     }
 
     Substring one = {0};
@@ -104,30 +81,31 @@ static int asm_one(const char *s, int address, int *out_word) {
         }
 
         int label = to_label_symbol(&one);
+        int address = emitter_current_address(emitter);
         label_dict_put(label, address);
-        return 0;
+        return;
     }
 
     int mnemonic = to_mnemonic_symbol(&one);
-    if(mnemonic == mnemonic_raw) {
+    if(mnemonic == RAW) {
         int word;
         if(parse_raw_word(&s, &word) && follows_eof(s)) {
-            *out_word = word;
-            return 1;
+            emitter_emit_word(emitter, word);
+            return;;
         }
-    } else if(mnemonic_b == mnemonic) {
+    } else if(B == mnemonic) {
         Substring subs = {0};
         if(parse_label(&s, &subs) && follows_eof(s)) {
-            LabelAddressReference r = {
-                .address = address,
+            UnresolveAddress r = {
+                .address = emitter_current_address(emitter),
                 .label = to_label_symbol(&subs),
                 .flag = 24,
             };
-            label_address_reference_push(&r);
-            *out_word = 0xEA000000;
-            return 1;
+            unresolve_address_push(&r);
+            emitter_emit_word(emitter, 0xEA000000);
+            return;
         }
-    } else if(mnemonic_ldr == mnemonic || mnemonic_str == mnemonic) {
+    } else if(LDR == mnemonic || STR == mnemonic) {
         int l_bit = str_eq_subs("ldr", &one)? 0x00100000: 0;
 
         int rd, rn;
@@ -140,8 +118,8 @@ static int asm_one(const char *s, int address, int *out_word) {
                 if(skip_sbracket_close(&s)
                     && follows_eof(s)) {
 
-                    *out_word = 0xE5800000 + l_bit + (rn << 16) + (rd << 12);
-                    return 1;
+                    emitter_emit_word(emitter, 0xE5800000 + l_bit + (rn << 16) + (rd << 12));
+                    return;
                 }
             } else {
                 int offset;
@@ -151,12 +129,12 @@ static int asm_one(const char *s, int address, int *out_word) {
                     && follows_eof(s)) {
 
                     int u_bit = (offset < 0)? 0: 0x00800000;
-                    *out_word = 0xE5000000 + l_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF);
-                    return 1;
+                    emitter_emit_word(emitter, 0xE5000000 + l_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF));
+                    return;
                 }
             }
         }
-    } else if(mnemonic_mov == mnemonic) {
+    } else if(MOV == mnemonic) {
         int rd;
         if(parse_register(&s, &rd)
             && skip_comma(&s)) {
@@ -165,8 +143,8 @@ static int asm_one(const char *s, int address, int *out_word) {
                 int rm;
                 if(parse_register(&s, &rm)
                     && follows_eof(s)) {
-                    *out_word = 0xE1A00000 + (rd << 12) + rm;
-                    return 1;
+                    emitter_emit_word(emitter, 0xE1A00000 + (rd << 12) + rm);
+                    return;
                 }
             } else {
                 int imm;
@@ -177,8 +155,8 @@ static int asm_one(const char *s, int address, int *out_word) {
                         assert_fail("INVALID REGISTER NUMBER");
                     }
 
-                    *out_word = 0xE3A00000 + (rd << 12) + imm;
-                    return 1;
+                    emitter_emit_word(emitter, 0xE3A00000 + (rd << 12) + imm);
+                    return;
                 }
             }
         }
@@ -188,56 +166,75 @@ static int asm_one(const char *s, int address, int *out_word) {
     assert_fail("UNKNOWN ASSEMBLY");
 }
 
-static void emit_word(Emitter *emitter, int word) {
-    emitter->buf[emitter->pos++] = word & 0xFF;
-    emitter->buf[emitter->pos++] = word >> 8 & 0xFF;
-    emitter->buf[emitter->pos++] = word >> 16 & 0xFF;
-    emitter->buf[emitter->pos++] = word >> 24 & 0xFF;
+
+static int string_to_mnemonic_symbol(const char *s) {
+    Substring subs = {.str = s, .len = strlen(s)};
+    return to_mnemonic_symbol(&subs);
 }
 
-static void patch_word(Emitter *emitter, int address ,int word) {
-    emitter->buf[address++] |= word & 0xFF;
-    emitter->buf[address++] |= word >> 8 & 0xFF;
-    emitter->buf[address++] |= word >> 16 & 0xFF;
-    emitter->buf[address++] |= word >> 24 & 0xFF;
+static void prepare_mnemonic_symbol() {
+    MOV = string_to_mnemonic_symbol("mov");
+    RAW = string_to_mnemonic_symbol(".raw");
+    LDR = string_to_mnemonic_symbol("ldr");
+    STR = string_to_mnemonic_symbol("str");
+    B = string_to_mnemonic_symbol("b");
 }
 
 
 /* unit test */
+static void test_init() {
+    mnemonic_symbol_clear();
+    label_symbol_clear();
+    label_dict_clear();
+    unresolve_address_clear();
+    prepare_mnemonic_symbol();
+}
+
 static void test_b_label() {
-    char *input = "b label";
-    int expect_word = 0xEA000000;
-    LabelAddressReference expect_ref= {
+    test_init();
+
+    char bin[10];
+    Emitter *emitter = emitter_new(bin);
+
+    asm_one(emitter, "b label");
+
+    int address = emitter_current_address(emitter);
+    int i = (bin[0] & 0xFF) == 0x00
+        && (bin[1] & 0xFF) == 0x00
+        && (bin[2] & 0xFF) == 0x00
+        && (bin[3] & 0xFF) == 0xEA;
+
+    assert(address == 4 && i);
+
+    UnresolveAddress actual = {0};
+    unresolve_address_pop(&actual);
+
+    UnresolveAddress exp = {
         .address = 0,
         .label = 10001,
-        .flag = 24
-    };
+        .flag = 24};
 
-    int word;
-    int success = asm_one(input, 0, &word);
-    assert(success);
-    assert(expect_word == word);
-
-    LabelAddressReference actual = *head;
-    int eq = expect_ref.address == actual.address
-        && expect_ref.label == actual.label
-        && expect_ref.flag == actual.flag;
+    int eq = exp.address == actual.address
+        && exp.label == actual.label
+        && exp.flag == actual.flag;
 
     assert(eq);
+
 }
 
-void test_label_address_reference() {
-    head = NULL;
-    LabelAddressReference lr = {.label = -1};
-    label_address_reference_push(&lr);
+static void test_label_address_reference() {
+    unresolve_address_clear();
+    UnresolveAddress lr = {.label = -1};
+    unresolve_address_push(&lr);
     lr.label = 2;
-    label_address_reference_push(&lr);
+    unresolve_address_push(&lr);
 
-    label_address_reference_pop(&lr);
+    unresolve_address_pop(&lr);
     assert(2 == lr.label);
-    label_address_reference_pop(&lr);
+    unresolve_address_pop(&lr);
     assert(-1 == lr.label);
 }
+
 
 
 void assembler_test() {

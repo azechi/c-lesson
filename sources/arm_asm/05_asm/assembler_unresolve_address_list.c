@@ -36,7 +36,7 @@ int unresolve_address_pop(UnresolveAddress *out_ua) {
 
     Node *tmp = head;
     head = head->next;
-    free(tmp);;
+    free(tmp);
     return 1;
 }
 

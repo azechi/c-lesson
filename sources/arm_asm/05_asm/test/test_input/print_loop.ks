@@ -1,5 +1,5 @@
 	ldr r0, =0x101f1000
-	ldr r0, =message
+	ldr r1, =message
 	ldrb r3, [r1]
 loop:
 	str r3, [r0]
@@ -10,4 +10,4 @@ loop:
 end:
 	b end
 message:
-	.raw "helo, world\n"
+	.raw "hello, world\n"

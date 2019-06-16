@@ -3,6 +3,7 @@
 #include <string.h>
 #include "parser.h"
 
+#define assert_fail(msg) assert(0&&(msg))
 
 typedef int (*Predicate_char)(int c);
 
@@ -16,6 +17,20 @@ static int is_one_first(int c);
 static int is_one_rest(int c);
 static int is_register_trailing(int c);
 
+void skip_equal_sign(char const **s) {
+    try_skip(s, is_space);
+    if(!try_skip_1_char(s, '=')) {
+        assert_fail("NOT EQUAL SIGN");
+    }
+}
+
+
+void eof(char const **s) {
+    try_skip(s, is_space);
+    if(**s != '\0') {
+        assert_fail("NOT EOF");
+    }
+}
 
 int parse_one(char const **s, Substring *out_subs) {
     try_skip(s, is_space);
@@ -38,6 +53,58 @@ int parse_label(char const **s, Substring *out_subs) {
     out_subs->len = len;
     *s += len;
     return 1;
+}
+
+void parse_raw_string(char const **s, char *const out_buf) {
+    try_skip(s, is_space);
+    try_skip_1_char(s, '"');
+
+    enum {imm, escape, terminate} state = imm;
+
+    int pos = 0;
+    while(state != terminate) {
+        char ch = *(*s)++;
+        if(ch == '\0') {
+            assert_fail("INVALID STRING");
+        }
+
+        switch(state) {
+            case imm:
+                switch(ch) {
+                    case '"':
+                        state = terminate;
+                        break;
+                    case '\\':
+                        state = escape;
+                        break;
+                    default:
+                        out_buf[pos++] = ch;
+                        break;
+                }
+                break;
+            case escape:
+                switch(ch) {
+                    case 'n':
+                        out_buf[pos++] = '\n';
+                        break;
+                    case '"':
+                        out_buf[pos++] = '"';
+                        break;
+                    case '\\':
+                        out_buf[pos++] = '\\';
+                        break;
+                    default:
+                        assert_fail("NOT INPLEMENTED");
+                }
+                state = imm;
+                break;
+            default:
+                assert_fail("NOT IMPLEMENTED");
+                return;
+        }
+    }
+
+    out_buf[pos++] = '\0';
 }
 
 int parse_register(char const **s, int *out_register) {
@@ -159,9 +226,20 @@ int follows_register(const char *s) {
         && try_skip_1(&s, is_register_trailing);
 }
 
+int follows_sbracket_open(const char *s) {
+    try_skip(&s, is_space);
+    return try_skip_1_char(&s, '[');
+}
+
 int follows_sbracket_close(const char *s) {
     try_skip(&s, is_space);
     return try_skip_1_char(&s, ']');
+}
+
+int follows_raw_word(const char *s) {
+    try_skip(&s, is_space);
+    return (try_skip_1_char(&s, '0')
+        && try_skip_1_char(&s, 'x'));
 }
 
 
@@ -199,7 +277,7 @@ static int try_skip_1_char(char const **s, char c) {
 }
 
 static int is_space(int c) {
-    return c == ' ';
+    return c == ' ' || c == '\t';
 }
 
 static int is_one_first(int c) {
@@ -216,17 +294,10 @@ static int is_register_trailing(int c) {
 
 
 /* unit test */
-static void verify_parse_one_failure(const char *input);
-static void verify_parse_one(const char *input, char *expect_one, char *expect_rest);
-
 typedef int(ParseInt)(char const **, int*);
-static void verify_parse_int_failure(ParseInt parse, const char *input);
-static void verify_parse_int(ParseInt parse, const char *input, int expect, char *expect_rest);
 
-static void verify_parse_one_failure(const char *input) {
-    int success = parse_one(&input, NULL);
-    assert(!success);
-}
+static void verify_parse_one(const char *input, char *expect_one, char *expect_rest);
+static void verify_parse_int(ParseInt parse, const char *input, int expect, char *expect_rest);
 
 static void verify_parse_one(const char *input, char *expect_one, char *expect_rest) {
     Substring actual = {0};
@@ -238,11 +309,6 @@ static void verify_parse_one(const char *input, char *expect_one, char *expect_r
     assert(eq && rest_eq);
 }
 
-static void verify_parse_int_failure(ParseInt parse, const char *input) {
-    int success = parse(&input, NULL);
-    assert(!success);
-}
-
 static void verify_parse_int(ParseInt parse, const char *input, int expect, char *expect_rest) {
     int actual = -1;
     int success = parse(&input, &actual);
@@ -252,26 +318,22 @@ static void verify_parse_int(ParseInt parse, const char *input, int expect, char
     assert(expect == actual && rest_eq);
 }
 
-void parser_test() {
-    /* parse_one */
-    verify_parse_one_failure("");
-    verify_parse_one_failure(" 1");
+static void verify_parse_raw_string(const char *input, const char *expect) {
+    char bin[20];
+    parse_raw_string(&input, bin);
 
+    int eq = strcmp(expect, bin) == 0;
+    assert(eq);
+}
+
+void parser_test() {
     verify_parse_one("mov", "mov", "");
     verify_parse_one(" mov, ", "mov", ", ");
-
-    /* parse_register */
-    verify_parse_int_failure(parse_register, "");
-    verify_parse_int_failure(parse_register, "r ");
-    verify_parse_int_failure(parse_register, "b10");
 
     verify_parse_int(parse_register, "r0", 0, "");
     verify_parse_int(parse_register, "r15 ", 15, " ");
     verify_parse_int(parse_register, "r2] ", 2, "] ");
     verify_parse_int(parse_register, "r3,r15", 3, ",r15");
 
-    /* parse_raw_word */
-
-
-
+    verify_parse_raw_string(" \" \\n \\\" \\\\ \"  ", " \n \" \\ ");
 }

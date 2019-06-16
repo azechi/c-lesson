@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <string.h>
+#include "substring.h"
 #include "assembler_emitter.h"
 
 struct Emitter_ {
@@ -23,6 +25,19 @@ void emitter_emit_word(Emitter *emitter, int word) {
     emitter->buf[emitter->pos++] = word >> 8 & 0xFF;
     emitter->buf[emitter->pos++] = word >> 16 & 0xFF;
     emitter->buf[emitter->pos++] = word >> 24 & 0xFF;
+}
+
+void emitter_emit_string(Emitter *emitter, const char *s) {
+    int i = strlen(s) + 1;
+    for(; i > 0; i--) {
+        emitter->buf[emitter->pos++] = *(s++);
+    }
+
+    i = emitter->pos % 4;
+    i = (i == 0)? i: 4 - i;
+    for(; i > 0; i--) {
+        emitter->buf[emitter->pos++] = '\0';
+    }
 }
 
 void emitter_patch_word(Emitter *emitter, int address ,int word) {

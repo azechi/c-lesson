@@ -7,6 +7,7 @@
 #include "assembler_emitter.h"
 #include "assembler_label_dict.h"
 #include "assembler_private.h"
+#include "assembler_delay_emit_word_list.h"
 #include "assembler_unresolve_address_list.h"
 
 #include <string.h>
@@ -14,16 +15,26 @@
 #define assert_fail(msg) assert(0&&(msg))
 
 
+typedef enum UnresolveAddressType_ {
+    ADDR_Imm_24,
+    ADDR_Imm_12,
+    ADDR_CONSTANT
+} UnresolveAddressType;
+
 int MOV;
+int ADD;
+int CMP;
 int RAW;
 int LDR;
+int LDRB;
 int STR;
 int B;
+int BNE;
 
 
 static void prepare_mnemonic_symbol();
 static void asm_one(Emitter *emitter, const char *s);
-static void asm_address(UnresolveAddress *lr, int *out_word);
+static void asm_address(Emitter *emitter, UnresolveAddress *lr);
 
 int assemble(char *const bin) {
     Emitter *emitter = emitter_new(bin);
@@ -33,11 +44,34 @@ int assemble(char *const bin) {
         asm_one(emitter, str);
     }
 
+    DelayEmitWord ew;
+    while(delay_emit_word_pop(&ew)) {
+        int address = emitter_current_address(emitter);
+        label_dict_put(ew.label, address);
+
+        switch(ew.type) {
+            case POOLITEM_CONSTANT:
+                emitter_emit_word(emitter, ew.u.constant);
+                break;
+            case POOLITEM_LABEL_REFERENCE:
+                {
+                    UnresolveAddress ula = {
+                        .address = address,
+                        .label = ew.u.target_label,
+                        .flag = ADDR_CONSTANT
+                    };
+                    unresolve_address_push(&ula);
+                    emitter_emit_word(emitter, 0);
+                }
+                break;
+            default:
+                assert_fail("INVALID LITERALPOOLITEMTYPE VALUE");
+        }
+    }
+
     UnresolveAddress lr;
     while(unresolve_address_pop(&lr)) {
-        int word = 0;
-        asm_address(&lr, &word);
-        emitter_patch_word(emitter, lr.address, word);
+        asm_address(emitter ,&lr);
     }
 
     int len = emitter_current_address(emitter);
@@ -46,7 +80,7 @@ int assemble(char *const bin) {
 }
 
 
-static void asm_address(UnresolveAddress *lr, int *out_word) {
+static void asm_address(Emitter *emitter, UnresolveAddress *lr) {
     int dest;
     if(!label_dict_get(lr->label, &dest)){
         assert_fail("UNKNOWN LABEL");
@@ -54,12 +88,196 @@ static void asm_address(UnresolveAddress *lr, int *out_word) {
 
     int offset;
     switch(lr->flag) {
-        case 24:
+        case ADDR_Imm_24:
             offset = (dest - lr->address - 8) >> 2;
-            *out_word = 0x00FFFFFF & offset;
+            emitter_patch_word(emitter, lr->address, 0x00FFFFFF & offset);
+            return;
+        case ADDR_Imm_12:
+            {
+                /* sign bit */
+                offset = (dest - lr->address - 8);
+                int u_bit = (offset < 0)? 0: 0x00800000;
+                emitter_patch_word(emitter, lr->address, (0x00000FFF & offset) + u_bit);
+            }
+            return;
+        case ADDR_CONSTANT:
+            {
+                offset = 0x00010000;
+                emitter_patch_word(emitter, lr->address, dest + offset);
+            }
             return;
         default:
             assert("NOT IMPLEMENTED");
+            return;
+    }
+}
+
+static void asm_data_processing(Emitter *emitter, int mnemonic, const char *s) {
+    if(LDR == mnemonic || STR == mnemonic || LDRB == mnemonic) {
+        int l_bit = (LDR == mnemonic || LDRB == mnemonic)? 0x00100000: 0;
+        int b_bit = (LDRB == mnemonic)? 0x00400000: 0;
+
+
+        /*
+            ldr rd, [rn]        // [rn, #0x00]
+            ldr rd, [rn, #0xFFF]
+            ldr rd, [rn, #-0xFFF]
+            ldr rd, =0x01234567 // [r15, #0x0F]
+            ldr rd, =label      // [r15, #-0xFF]
+        */
+
+        int rd;
+        parse_register(&s, &rd);
+        skip_comma(&s);
+
+        if(follows_sbracket_open(s)) {
+            int rn;
+            skip_sbracket_open(&s);
+            parse_register(&s, &rn);
+
+            if(follows_sbracket_close(s)) {
+                skip_sbracket_close(&s);
+                eof(&s);
+                int u_bit = 0x00800000;
+                emitter_emit_word(emitter, 0xE5000000 + l_bit + b_bit + u_bit + (rn << 16) + (rd << 12));
+                return;
+            }
+            skip_comma(&s);
+
+            int offset;
+            parse_immediate(&s, &offset);
+            skip_sbracket_close(&s);
+            eof(&s);
+
+            int u_bit = (offset < 0)? 0: 0x00800000;
+            emitter_emit_word(emitter, 0xE5000000 + l_bit + b_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF));
+            return;
+        }
+
+        skip_equal_sign(&s);
+
+        if(follows_raw_word(s)) {
+            const char *begin = s - 1; /* -1 = '=' */
+            int word;
+            parse_raw_word(&s, &word);
+
+            Substring implicit_label = {.str = begin, .len = s - begin};
+
+            UnresolveAddress r = {
+                .address = emitter_current_address(emitter),
+                .label = to_label_symbol(&implicit_label),
+                .flag = ADDR_Imm_12,
+            };
+            unresolve_address_push(&r);
+
+            DelayEmitWord item = {
+                .label = to_label_symbol(&implicit_label),
+                .type = POOLITEM_CONSTANT,
+                .u.constant = word
+            };
+            delay_emit_word_push(&item);
+
+        } else {
+            const char *begin = s - 1;
+            Substring target_label = {0};
+            parse_label(&s, &target_label);
+
+            Substring implicit_label = {.str = begin, .len = s - begin};
+
+            UnresolveAddress r = {
+                .address = emitter_current_address(emitter),
+                .label = to_label_symbol(&implicit_label),
+                .flag = ADDR_Imm_12,
+            };
+
+            unresolve_address_push(&r);
+
+            DelayEmitWord item = {
+                .label = to_label_symbol(&implicit_label),
+                .type = POOLITEM_LABEL_REFERENCE,
+                .u.target_label = to_label_symbol(&target_label)
+            };
+            delay_emit_word_push(&item);
+        }
+        eof(&s);
+
+        /* append pseudo label reference */
+
+        /* delay(register pseudo label address) */
+
+
+        int rn = 15;
+        emitter_emit_word(emitter, 0xE5800000 + l_bit + b_bit + (rn << 16) + (rd << 12));
+        return;
+    } else if(CMP == mnemonic) {
+        /* cmp rn, #0xFFF */
+        int rn;
+        parse_register(&s, &rn);
+        skip_comma(&s);
+        int imm;
+        parse_immediate(&s, &imm);
+        eof(&s);
+
+        int i_bit = 0x02000000;
+        int s_bit = 0x00100000;
+        int opcode = 0x01400000;
+
+        /* not implement 4bit rotate. only 8 bit immediate value is supported*/
+        if(imm < 0 || 0xFF < imm) {
+            assert_fail("INVALID REGISTER NUMBER");
+        }
+
+        emitter_emit_word(emitter, 0xE0000000 + s_bit + i_bit + opcode + (rn << 16) + imm);
+        return;
+
+
+    } else if(ADD == mnemonic) {
+        /* add rd, rn, #0xFFF */
+        int rd;
+        parse_register(&s, &rd);
+        skip_comma(&s);
+        int rn;
+        parse_register(&s, &rn);
+        skip_comma(&s);
+        int imm;
+        parse_immediate(&s, &imm);
+        eof(&s);
+
+        int i_bit = 0x02000000;
+        int opcode = 0x00800000;
+
+        emitter_emit_word(emitter, 0xE0000000 + i_bit + opcode + (rd << 16) + (rn << 12) + imm);
+        return;
+
+
+    } else if(MOV == mnemonic) {
+        int rd;
+        parse_register(&s, &rd);
+        skip_comma(&s);
+        /* mov rd, */
+
+        if(follows_register(s)) {
+            /* mov rd, rm */
+            int rm;
+            parse_register(&s, &rm);
+            eof(&s);
+
+            emitter_emit_word(emitter, 0xE1A00000 + (rd << 12) + rm);
+            return;
+        }
+
+        /* mov rd, #0xFFF; */
+        int imm;
+        parse_immediate(&s, &imm);
+        eof(&s);
+
+        /* not implement 4bit rotate. only 8 bit immediate value is supported*/
+        if(imm < 0 || 0xFF < imm) {
+            assert_fail("INVALID REGISTER NUMBER");
+        }
+
+        emitter_emit_word(emitter, 0xE3A00000 + (rd << 12) + imm);
+        return;
     }
 }
 
@@ -76,10 +294,6 @@ static void asm_one(Emitter *emitter, const char *s) {
     }
 
     if(one_is_label(&one)) {
-        if(find_label_symbol(&one)) {
-            assert_fail("DUPLICATE LABEL");
-        }
-
         int label = to_label_symbol(&one);
         int address = emitter_current_address(emitter);
         label_dict_put(label, address);
@@ -88,80 +302,37 @@ static void asm_one(Emitter *emitter, const char *s) {
 
     int mnemonic = to_mnemonic_symbol(&one);
     if(mnemonic == RAW) {
-        int word;
-        if(parse_raw_word(&s, &word) && follows_eof(s)) {
+        if(follows_raw_word(s)) {
+            int word;
+            parse_raw_word(&s, &word);
+            eof(&s);
             emitter_emit_word(emitter, word);
-            return;;
+            return;
         }
-    } else if(B == mnemonic) {
+
+        char s_buf[1024];
+        parse_raw_string(&s, s_buf);
+        eof(&s);
+        emitter_emit_string(emitter, s_buf);
+        return;
+    } else if(B == mnemonic || BNE == mnemonic) {
+        int cond = (BNE == mnemonic)? 0x10000000: 0xE0000000;
+
         Substring subs = {0};
         if(parse_label(&s, &subs) && follows_eof(s)) {
             UnresolveAddress r = {
                 .address = emitter_current_address(emitter),
                 .label = to_label_symbol(&subs),
-                .flag = 24,
+                .flag = ADDR_Imm_24,
             };
             unresolve_address_push(&r);
-            emitter_emit_word(emitter, 0xEA000000);
+            emitter_emit_word(emitter, cond + 0x0A000000);
             return;
         }
-    } else if(LDR == mnemonic || STR == mnemonic) {
-        int l_bit = str_eq_subs("ldr", &one)? 0x00100000: 0;
-
-        int rd, rn;
-        if(parse_register(&s, &rd)
-            && skip_comma(&s)
-            && skip_sbracket_open(&s)
-            && parse_register(&s, &rn)) {
-
-            if(follows_sbracket_close(s)) {
-                if(skip_sbracket_close(&s)
-                    && follows_eof(s)) {
-
-                    emitter_emit_word(emitter, 0xE5800000 + l_bit + (rn << 16) + (rd << 12));
-                    return;
-                }
-            } else {
-                int offset;
-                if(skip_comma(&s)
-                    && parse_immediate(&s, &offset)
-                    && skip_sbracket_close(&s)
-                    && follows_eof(s)) {
-
-                    int u_bit = (offset < 0)? 0: 0x00800000;
-                    emitter_emit_word(emitter, 0xE5000000 + l_bit + u_bit + (rn << 16) + (rd << 12) + (abs(offset) & 0xFFF));
-                    return;
-                }
-            }
-        }
-    } else if(MOV == mnemonic) {
-        int rd;
-        if(parse_register(&s, &rd)
-            && skip_comma(&s)) {
-
-            if(follows_register(s)) {
-                int rm;
-                if(parse_register(&s, &rm)
-                    && follows_eof(s)) {
-                    emitter_emit_word(emitter, 0xE1A00000 + (rd << 12) + rm);
-                    return;
-                }
-            } else {
-                int imm;
-                if(parse_immediate(&s, &imm)
-                    && follows_eof(s)) {
-                    /* not implement 4bit rotate. only 8 bit immediate value is supported*/
-                    if(imm < 0 || 0xFF < imm) {
-                        assert_fail("INVALID REGISTER NUMBER");
-                    }
-
-                    emitter_emit_word(emitter, 0xE3A00000 + (rd << 12) + imm);
-                    return;
-                }
-            }
-        }
+    } else {
+        asm_data_processing(emitter, mnemonic, s);
+        return;
     }
-
 
     assert_fail("UNKNOWN ASSEMBLY");
 }
@@ -174,10 +345,14 @@ static int string_to_mnemonic_symbol(const char *s) {
 
 static void prepare_mnemonic_symbol() {
     MOV = string_to_mnemonic_symbol("mov");
+    ADD = string_to_mnemonic_symbol("add");
+    CMP = string_to_mnemonic_symbol("cmp");
     RAW = string_to_mnemonic_symbol(".raw");
     LDR = string_to_mnemonic_symbol("ldr");
+    LDRB = string_to_mnemonic_symbol("ldrb");
     STR = string_to_mnemonic_symbol("str");
     B = string_to_mnemonic_symbol("b");
+    BNE = string_to_mnemonic_symbol("bne");
 }
 
 
@@ -212,7 +387,8 @@ static void test_b_label() {
     UnresolveAddress exp = {
         .address = 0,
         .label = 10001,
-        .flag = 24};
+        .flag = ADDR_Imm_24
+    };
 
     int eq = exp.address == actual.address
         && exp.label == actual.label
@@ -224,24 +400,85 @@ static void test_b_label() {
 
 static void test_label_address_reference() {
     unresolve_address_clear();
-    UnresolveAddress lr = {.label = -1};
+    UnresolveAddress lr = {.label = 1};
     unresolve_address_push(&lr);
     lr.label = 2;
     unresolve_address_push(&lr);
+    lr.label = 3;
+    unresolve_address_push(&lr);
 
-    unresolve_address_pop(&lr);
-    assert(2 == lr.label);
-    unresolve_address_pop(&lr);
-    assert(-1 == lr.label);
+    UnresolveAddress actual = {0};
+    unresolve_address_pop(&actual);
+    assert(3 == actual.label);
+    unresolve_address_pop(&actual);
+    assert(2 == actual.label);
+    unresolve_address_pop(&actual);
+    assert(1 == actual.label);
 }
 
+static void test_delay_emit_word() {
+    delay_emit_word_clear();
+    DelayEmitWord item = {.label = 1};
+    delay_emit_word_push(&item);
+    item.label = 2;
+    delay_emit_word_push(&item);
+    item.label = 3;
+    delay_emit_word_push(&item);
 
+    DelayEmitWord actual = {0};
+    delay_emit_word_pop(&actual);
+    assert(1 == actual.label);
+    delay_emit_word_pop(&actual);
+    assert(2 == actual.label);
+    delay_emit_word_pop(&actual);
+    assert(3 == actual.label);
+
+    int notany = !delay_emit_word_pop(&actual);
+    assert(notany);
+
+
+}
+
+void test_asm_one_raw_string() {
+    char *input = ".raw \"hello, world\n\"";
+    char expect[] = {
+        0X68, 0X65, 0X6C, 0X6C,
+        0X6F, 0X2C, 0X20, 0X77,
+        0X6F, 0X72, 0X6C, 0X64,
+        0X0A, 0X00, 0X00, 0X00
+    };
+
+    test_init();
+
+    char bin[100 * 1024];
+    Emitter *emitter = emitter_new(bin);
+
+    asm_one(emitter, input);
+
+    int address = emitter_current_address(emitter);
+    assert(address == sizeof(expect));
+
+    int i = 0;
+    int eq = 1;
+    for(; eq && i < sizeof(expect); i++) {
+        eq = expect[i] == bin[i];
+    }
+    assert(eq);
+}
 
 void assembler_test() {
 
     test_b_label();
 
     test_label_address_reference();
+    test_delay_emit_word();
+
+    test_asm_one_raw_string();
+/*
+	"ldr r0, =0x101f1000", 0xE59F0000, append(symbol("101F1000"), value = 0xE59F000), unresolve(address = 0, symbol("101F1000"))
+	"ldr r0, =message", 0xE59F0000, unresolve(address = 0, symbol("message"))
+*/
+
 
     /*
     verify_asm_one_inst("mov r1, r2", 0xE1A01002);

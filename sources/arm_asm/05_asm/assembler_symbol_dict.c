@@ -25,11 +25,13 @@ static Node *insert(Node **root, const Substring *s);
 
 void mnemonic_symbol_clear() {
     mnemonic_root = NULL;
+    mnemonic_value = 1;
     /* TODO free Node */
 }
 
 void label_symbol_clear() {
     label_root = NULL;
+    label_value = 10001;
     /* TODO free Node */
 }
 

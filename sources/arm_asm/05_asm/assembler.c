@@ -29,8 +29,10 @@ int LDR;
 int LDRB;
 int STR;
 int B;
+int BL;
 int BNE;
-
+int STMDB;
+int LDMIA;
 
 static void prepare_mnemonic_symbol();
 static void asm_one(Emitter *emitter, const char *s);
@@ -180,7 +182,7 @@ static void asm_data_processing(Emitter *emitter, int mnemonic, const char *s) {
         } else {
             const char *begin = s - 1;
             Substring target_label = {0};
-            parse_label(&s, &target_label);
+            parse_one(&s, &target_label);
 
             Substring implicit_label = {.str = begin, .len = s - begin};
 
@@ -279,6 +281,8 @@ static void asm_data_processing(Emitter *emitter, int mnemonic, const char *s) {
         emitter_emit_word(emitter, 0xE3A00000 + (rd << 12) + imm);
         return;
     }
+
+    assert_fail("NOT IMPLEMENTED");
 }
 
 static void asm_one(Emitter *emitter, const char *s) {
@@ -315,20 +319,43 @@ static void asm_one(Emitter *emitter, const char *s) {
         eof(&s);
         emitter_emit_string(emitter, s_buf);
         return;
-    } else if(B == mnemonic || BNE == mnemonic) {
+    } else if(B == mnemonic || BL == mnemonic || BNE == mnemonic) {
         int cond = (BNE == mnemonic)? 0x10000000: 0xE0000000;
 
+        int l_bit = (BL == mnemonic)? 0x01000000: 0;
+
         Substring subs = {0};
-        if(parse_label(&s, &subs) && follows_eof(s)) {
+        if(parse_one(&s, &subs) && follows_eof(s)) {
             UnresolveAddress r = {
                 .address = emitter_current_address(emitter),
                 .label = to_label_symbol(&subs),
                 .flag = ADDR_Imm_24,
             };
             unresolve_address_push(&r);
-            emitter_emit_word(emitter, cond + 0x0A000000);
+            emitter_emit_word(emitter, cond + 0x0A000000 + l_bit);
             return;
         }
+
+    } else if (STMDB == mnemonic || LDMIA == mnemonic) {
+        /* Block Data Transfer */
+
+        int cond = 0xE0000000;
+        int p_bit = (STMDB == mnemonic)? 0x01000000: 0;
+        int u_bit = (LDMIA == mnemonic)? 0x00800000: 0;
+        int s_bit = 0;
+        int l_bit = (LDMIA == mnemonic)? 0x00100000: 0;
+
+
+        int rn;
+        parse_register(&s, &rn);
+        int w_bit =  try_skip_bang(&s)? 0x00200000: 0;
+        skip_comma(&s);
+
+        int reg_list;
+        parse_register_list(&s, &reg_list);
+        emitter_emit_word(emitter, cond + 0x08000000 + p_bit + u_bit + s_bit + w_bit + l_bit + (rn << 16) + reg_list);
+        return;
+
     } else {
         asm_data_processing(emitter, mnemonic, s);
         return;
@@ -352,7 +379,10 @@ static void prepare_mnemonic_symbol() {
     LDRB = string_to_mnemonic_symbol("ldrb");
     STR = string_to_mnemonic_symbol("str");
     B = string_to_mnemonic_symbol("b");
+    BL = string_to_mnemonic_symbol("bl");
     BNE = string_to_mnemonic_symbol("bne");
+    STMDB = string_to_mnemonic_symbol("stmdb");
+    LDMIA = string_to_mnemonic_symbol("ldmia");
 }
 
 
@@ -466,6 +496,55 @@ void test_asm_one_raw_string() {
     assert(eq);
 }
 
+static void test_bl() {
+
+    test_init();
+
+    char bin[10];
+    Emitter *emitter = emitter_new(bin);
+
+    asm_one(emitter, "bl label");
+
+    int address = emitter_current_address(emitter);
+    int i = (bin[0] & 0xFF) == 0x00
+        && (bin[1] & 0xFF) == 0x00
+        && (bin[2] & 0xFF) == 0x00
+        && (bin[3] & 0xFF) == 0xEB;
+
+    assert(address == 4 && i);
+
+    UnresolveAddress actual = {0};
+    unresolve_address_pop(&actual);
+
+    UnresolveAddress exp = {
+        .address = 0,
+        .label = 10001,
+        .flag = ADDR_Imm_24
+    };
+
+    int eq = exp.address == actual.address
+        && exp.label == actual.label
+        && exp.flag == actual.flag;
+
+    assert(eq);
+}
+
+void verify_asm_one(char *input, int expect) {
+    test_init();
+    char bin[10];
+    Emitter *emitter = emitter_new(bin);
+
+    asm_one(emitter, input);
+
+    int address = emitter_current_address(emitter);
+    int eq = (bin[0] & 0xFF) == (expect & 0xFF)
+        && (bin[1] & 0xFF) == (expect >> 8 & 0xFF)
+        && (bin[2] & 0xFF) == (expect >> 16 & 0xFF)
+        && (bin[3] & 0xFF) == (expect >> 24 & 0xFF);
+
+    assert(address == 4 && eq);
+}
+
 void assembler_test() {
 
     test_b_label();
@@ -474,24 +553,28 @@ void assembler_test() {
     test_delay_emit_word();
 
     test_asm_one_raw_string();
+
+    test_bl();
+
+    verify_asm_one("mov r1, r2", 0xE1A01002);
+    verify_asm_one(" mov r15 ,  r0  ", 0xE1A0F000);
+    verify_asm_one("mov r1, #0x68", 0xE3A01068);
+
+    verify_asm_one(".raw 0x12345678", 0x12345678);
+    verify_asm_one(".raw 0x80000001", 0x80000001);
+
+    verify_asm_one("ldr r1, [r15, #0x30]", 0xE59F1030);
+    verify_asm_one("ldr r1, [r15, #-0x30]", 0xE51F1030);
+    verify_asm_one("ldr r1, [r15]", 0xE59F1000);
+    verify_asm_one("str r0, [r1]", 0xE5810000);
+    verify_asm_one("stmdb r13!, {r1, r14}", 0xE92D4002);
+    verify_asm_one("ldmia r13!, {r1, r14}", 0xE8BD4002);
+
+
 /*
 	"ldr r0, =0x101f1000", 0xE59F0000, append(symbol("101F1000"), value = 0xE59F000), unresolve(address = 0, symbol("101F1000"))
 	"ldr r0, =message", 0xE59F0000, unresolve(address = 0, symbol("message"))
 */
 
-
-    /*
-    verify_asm_one_inst("mov r1, r2", 0xE1A01002);
-    verify_asm_one_inst(" mov r15 ,  r0  ", 0xE1A0F000);
-    verify_asm_one_inst("mov r1, #0x68", 0xE3A01068);
-
-    verify_asm_one_inst(".raw 0x12345678", 0x12345678);
-    verify_asm_one_inst(".raw 0x80000001", 0x80000001);
-
-    verify_asm_one_inst("ldr r1, [r15, #0x30]", 0xE59F1030);
-    verify_asm_one_inst("ldr r1, [r15, #-0x30]", 0xE51F1030);
-    verify_asm_one_inst("ldr r1, [r15]", 0xE59F1000);
-    verify_asm_one_inst("str r0, [r1]", 0xE5810000);
-    */
 }
 

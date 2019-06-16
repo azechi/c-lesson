@@ -45,16 +45,6 @@ int parse_one(char const **s, Substring *out_subs) {
     return 1;
 }
 
-int parse_label(char const **s, Substring *out_subs) {
-    try_skip(s, is_space);
-
-    int len = look_ahead(*s, isalpha);
-    out_subs->str = *s;
-    out_subs->len = len;
-    *s += len;
-    return 1;
-}
-
 void parse_raw_string(char const **s, char *const out_buf) {
     try_skip(s, is_space);
     try_skip_1_char(s, '"');
@@ -194,6 +184,26 @@ int parse_immediate(char const **s, int *out_immediate) {
     return 0;
 }
 
+void parse_register_list(char const **s, int *out_bits) {
+    try_skip(s, is_space);
+    if(try_skip_1_char(s, '{')) {
+        int acm = 0;
+        do {
+            int i;
+            parse_register(s, &i);
+            try_skip(s, is_space);
+
+            acm += 1 << i;
+
+        } while(try_skip_1_char(s, ','));
+
+        try_skip_1_char(s, '}');
+        *out_bits = acm;
+    }
+}
+
+
+
 int skip_comma(char const **s) {
     try_skip(s, is_space);
     return try_skip_1_char(s, ',');
@@ -207,6 +217,10 @@ int skip_sbracket_open(char const **s) {
 int skip_sbracket_close(char const **s) {
     try_skip(s, is_space);
     return try_skip_1_char(s, ']');
+}
+
+int try_skip_bang(char const **s) {
+    return try_skip_1_char(s, '!');
 }
 
 int one_is_label(const Substring *subs) {

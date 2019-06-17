@@ -21,8 +21,11 @@ typedef enum UnresolveAddressType_ {
     ADDR_CONSTANT
 } UnresolveAddressType;
 
+int AND;
 int MOV;
+int LSR;
 int ADD;
+int SUB;
 int CMP;
 int RAW;
 int LDR;
@@ -30,6 +33,7 @@ int LDRB;
 int STR;
 int B;
 int BL;
+int BLE;
 int BNE;
 int STMDB;
 int LDMIA;
@@ -233,7 +237,7 @@ static void asm_data_processing(Emitter *emitter, int mnemonic, const char *s) {
         return;
 
 
-    } else if(ADD == mnemonic) {
+    } else if(AND == mnemonic || ADD == mnemonic || SUB == mnemonic) {
         /* add rd, rn, #0xFFF */
         int rd;
         parse_register(&s, &rd);
@@ -246,13 +250,13 @@ static void asm_data_processing(Emitter *emitter, int mnemonic, const char *s) {
         eof(&s);
 
         int i_bit = 0x02000000;
-        int opcode = 0x00800000;
+        int opcode = (AND == mnemonic)? 0x0: (ADD == mnemonic)? 0x00800000: 0x00400000;
 
         emitter_emit_word(emitter, 0xE0000000 + i_bit + opcode + (rd << 16) + (rn << 12) + imm);
         return;
 
 
-    } else if(MOV == mnemonic) {
+    } else if(MOV == mnemonic || LSR == mnemonic) {
         int rd;
         parse_register(&s, &rd);
         skip_comma(&s);
@@ -262,6 +266,17 @@ static void asm_data_processing(Emitter *emitter, int mnemonic, const char *s) {
             /* mov rd, rm */
             int rm;
             parse_register(&s, &rm);
+            if(LSR == mnemonic) {
+                /* lsr rd, rm, rs */
+                int rs;
+                skip_comma(&s);
+                parse_register(&s, &rs);
+                int shift = 0x00000030 + (rs << 8);
+
+                emitter_emit_word(emitter, 0xE1A00000 + (rd << 12) + shift + rm );
+                return;
+            }
+
             eof(&s);
 
             emitter_emit_word(emitter, 0xE1A00000 + (rd << 12) + rm);
@@ -319,22 +334,23 @@ static void asm_one(Emitter *emitter, const char *s) {
         eof(&s);
         emitter_emit_string(emitter, s_buf);
         return;
-    } else if(B == mnemonic || BL == mnemonic || BNE == mnemonic) {
-        int cond = (BNE == mnemonic)? 0x10000000: 0xE0000000;
+    } else if(B == mnemonic || BL == mnemonic || BLE == mnemonic || BNE == mnemonic) {
+        int cond = (BLE == mnemonic)? 0xD0000000: (BNE == mnemonic)? 0x10000000: 0xE0000000;
 
         int l_bit = (BL == mnemonic)? 0x01000000: 0;
 
         Substring subs = {0};
-        if(parse_one(&s, &subs) && follows_eof(s)) {
-            UnresolveAddress r = {
-                .address = emitter_current_address(emitter),
-                .label = to_label_symbol(&subs),
-                .flag = ADDR_Imm_24,
-            };
-            unresolve_address_push(&r);
-            emitter_emit_word(emitter, cond + 0x0A000000 + l_bit);
-            return;
-        }
+        parse_one(&s, &subs);
+        eof(&s);
+
+        UnresolveAddress r = {
+            .address = emitter_current_address(emitter),
+            .label = to_label_symbol(&subs),
+            .flag = ADDR_Imm_24,
+        };
+        unresolve_address_push(&r);
+        emitter_emit_word(emitter, cond + 0x0A000000 + l_bit);
+        return;
 
     } else if (STMDB == mnemonic || LDMIA == mnemonic) {
         /* Block Data Transfer */
@@ -371,8 +387,11 @@ static int string_to_mnemonic_symbol(const char *s) {
 }
 
 static void prepare_mnemonic_symbol() {
+    AND = string_to_mnemonic_symbol("and");
     MOV = string_to_mnemonic_symbol("mov");
+    LSR = string_to_mnemonic_symbol("lsr");
     ADD = string_to_mnemonic_symbol("add");
+    SUB = string_to_mnemonic_symbol("sub");
     CMP = string_to_mnemonic_symbol("cmp");
     RAW = string_to_mnemonic_symbol(".raw");
     LDR = string_to_mnemonic_symbol("ldr");
@@ -380,6 +399,7 @@ static void prepare_mnemonic_symbol() {
     STR = string_to_mnemonic_symbol("str");
     B = string_to_mnemonic_symbol("b");
     BL = string_to_mnemonic_symbol("bl");
+    BLE = string_to_mnemonic_symbol("ble");
     BNE = string_to_mnemonic_symbol("bne");
     STMDB = string_to_mnemonic_symbol("stmdb");
     LDMIA = string_to_mnemonic_symbol("ldmia");
@@ -570,6 +590,8 @@ void assembler_test() {
     verify_asm_one("stmdb r13!, {r1, r14}", 0xE92D4002);
     verify_asm_one("ldmia r13!, {r1, r14}", 0xE8BD4002);
 
+    verify_asm_one("lsr r0, r1, r2", 0xE1A00231);
+    verify_asm_one("and r0, r0, #0x0F", 0xE200000F);
 
 /*
 	"ldr r0, =0x101f1000", 0xE59F0000, append(symbol("101F1000"), value = 0xE59F000), unresolve(address = 0, symbol("101F1000"))

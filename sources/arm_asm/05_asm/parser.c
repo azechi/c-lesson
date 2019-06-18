@@ -12,10 +12,42 @@ static int try_skip(char const **s, Predicate_char pred);
 static int try_skip_1(char const **s, Predicate_char pred);
 static int try_skip_1_char(char const **s, char c);
 
+static int is_blank(int c);
 static int is_space(int c);
 static int is_one_first(int c);
 static int is_one_rest(int c);
 static int is_register_trailing(int c);
+
+
+
+
+static int try_ex_parse_int_10base(char const **str, int *out_val);
+static int try_ex_parse_int_16base(char const **str, int *out_val);
+static int try_parse_register(char const **str, int *out_rn);
+static void skip_blank(char const **str);
+static int try_parse_immediate_value(char const **str, int *out_val);
+static int follows_eol(const char *s);
+
+static int try_skip_comma(char const **str);
+
+
+
+static int try_skip_char(char const **str, char ch);
+static int try_ex_skip_char(char const **str, char ch);
+static int try_ex_skip_1(char const **str, Predicate_char pred);
+static int try_ex_skip(char const **str, Predicate_char pred);
+
+
+
+
+
+
+
+
+
+
+
+
 
 void skip_equal_sign(char const **s) {
     try_skip(s, is_space);
@@ -290,6 +322,11 @@ static int try_skip_1_char(char const **s, char c) {
     return 1;
 }
 
+static int is_blank(int c) {
+    return c == ' ' || c == '\t';
+}
+
+
 static int is_space(int c) {
     return c == ' ' || c == '\t';
 }
@@ -305,6 +342,348 @@ static int is_one_rest(int c) {
 static int is_register_trailing(int c) {
     return is_space(c) || c == ',' || c == ']' || c == '\0';
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int try_parse_rd_rm_eol(char const **str, int *out_rd, int *out_rm) {
+    const char *s = *str;
+    
+    if(try_parse_register(&s, out_rd)
+        && try_skip_comma(&s)
+        && try_parse_register(&s, out_rm)
+        && follows_eol(s)) {
+
+        *str = s;
+        return 1;
+    }
+
+    return 0;
+}
+
+int try_parse_rd_rm_rs_eol(char const **str, int *out_rd, int *out_rm, int *out_rs) {
+    const char *s = *str;
+    
+    if(try_parse_register(&s, out_rd)
+        && try_skip_comma(&s)
+        && try_parse_register(&s, out_rm)
+        && try_skip_comma(&s)
+        && try_parse_register(&s, out_rs)
+        && follows_eol(s)) {
+
+        *str = s;
+        return 1;
+    }
+
+    return 0;
+}
+
+int try_parse_rx_imm_eol(char const **str, int *out_rx, int *out_imm) {
+    const char *s = *str;
+    
+    if(try_parse_register(&s, out_rx)
+        && try_skip_comma(&s)
+        && try_parse_immediate_value(&s, out_imm)
+        && follows_eol(s)) {
+
+        *str = s;
+        return 1;
+    }
+
+    return 0;
+}
+
+int try_parse_rd_rn_imm_eol(char const **str, int *out_rd, int *out_rn, int *out_imm) {
+    const char *s = *str;
+    
+    if(try_parse_register(&s, out_rd)
+        && try_skip_comma(&s)
+        && try_parse_register(&s, out_rn)
+        && try_skip_comma(&s)
+        && try_parse_immediate_value(&s, out_imm)
+        && follows_eol(s)) {
+
+        *str = s;
+        return 1;
+    }
+
+    return 0;
+}
+
+int try_parse_rd_expr_eol(char const **str, int *out_rd, int *out_val, Substring *out_expr) {
+    /* r1, =0x12345678 */
+    const char *s = *str;
+    if(try_parse_register(&s, out_rd)
+        && try_skip_comma(&s)
+        && try_skip_char(&s, '=')) {
+
+        const char *begin = s - 1;
+        out_expr->str = begin;
+
+        if(try_ex_parse_int_16base(&s, out_val)
+            && follows_eol(s)){
+
+            out_expr->len = s - begin;
+            *str = s;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+
+
+
+static int try_ex_parse_label(char const **str, Substring *out_label) {
+    const char *s = *str;
+    if(try_ex_skip_1(&s, is_one_first)
+        && try_ex_skip(&s, is_one_rest)) {
+        out_label->str = *str;
+        out_label->len = s - *str;
+        *str = s;
+        return 1;
+    }
+
+    return 0;
+}
+
+int try_parse_rd_label_eol(char const **str, int *out_rd, Substring *out_label, Substring *out_expr) {
+    /* r1, =label */
+    const char *s = *str;
+    if(try_parse_register(&s, out_rd)
+        && try_skip_comma(&s)
+        && try_skip_char(&s, '=')) {
+
+        const char *begin = s - 1;
+        out_expr->str = begin;
+
+        if(try_ex_parse_label(&s, out_label)
+            && follows_eol(s)){
+
+            out_expr->len = s - begin;
+            *str = s;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int try_parse_rd__rn__eol(char const **str, int *out_rd, int *out_rn) {
+    /* rd, [rn] */
+    const char *s = *str;
+    if(try_parse_register(&s, out_rd)
+        && try_skip_char(&s, ',')
+        && try_skip_char(&s, '[')
+        && try_parse_register(&s, out_rn)
+        && try_skip_char(&s, ']')
+        && follows_eol(s)) {
+        
+        *str = s;
+        return 1;
+    }
+
+    return 0;
+}
+
+int try_parse_rd__rn_imm__eol(char const **str, int *out_rd, int *out_rn, int *out_imm) {
+    /* rd, [rn, #imm] */
+    const char *s = *str;
+    if(try_parse_register(&s, out_rd)
+        && try_skip_char(&s, ',')
+        && try_skip_char(&s, '[')
+        && try_parse_register(&s, out_rn)
+        && try_skip_char(&s, ',')
+        && try_parse_immediate_value(&s, out_imm)
+        && try_skip_char(&s, ']')
+        && follows_eol(s)) {
+        
+        *str = s;
+        return 1;
+    }
+
+    return 0;
+
+}
+
+
+
+
+
+static int try_ex_skip_string(char const **str, const char *expect) {
+    const char *s = *str;
+    int len = strlen(expect);
+    for(; len > 0; len--) {
+        if(tolower(*s++) != tolower(*expect++)) {
+            return 0;
+        }
+    }
+    *str = s;
+    return 1;
+}
+
+
+static int try_ex_parse_int_10base(char const **str, int *out_val) {
+    const char *s = *str;
+    if(try_ex_skip_string(&s, "0x")) {
+        return 0;
+    }
+
+    if(!isdigit(*s)){
+        return 0;
+    }
+
+    int len = look_ahead(s, isdigit);
+    int acm = 0;
+    for(; len > 0; len--) {
+        acm = acm * 10 + (*s - '0');
+        ++s;
+    }
+    
+    *out_val = acm;
+    *str = s;
+    return 1;
+}
+
+static int try_ex_parse_int_16base(char const **str, int *out_val) {
+    const char *s = *str;
+    if(!try_ex_skip_string(&s, "0x")) {
+        return 0;
+    }
+
+    int len = look_ahead(s, isxdigit);
+    if(len > 8){
+        return 0;
+    }
+
+    int acm = 0;
+    char c;
+    for(; len > 0; len--) {
+        c = *s;
+        acm = (acm << 4) + ((isdigit(c))? c - '0': toupper(c) - 'A' + 10);
+        ++s;
+    }
+
+    *out_val = acm;
+    *str = s;
+    return 1;
+}
+
+static int try_parse_register(char const **str, int *out_rn) {
+    const char *s = *str;
+    skip_blank(&s);
+
+    int i;
+    if(try_skip_char(&s, 'r') 
+        && try_ex_parse_int_10base(&s, &i)
+        && (0 <= i && i <= 16)) {
+        
+        *out_rn = i;
+        *str = s;
+        return 1;
+    }
+    return 0;
+}
+
+static int try_skip_char(char const **str, char ch) {
+    const char *s = *str;
+    skip_blank(&s);
+    if(try_ex_skip_char(&s, ch)){
+        *str = s;
+        return 1;
+    }
+    return 0;
+}
+
+static int try_skip_comma(char const **str) {
+    const char *s = *str;
+    skip_blank(&s);
+    if(*s == ',') {
+        *str = ++s;
+        return 1;
+    }
+    return 0;
+}
+
+static int try_ex_skip(char const **str, Predicate_char pred) {
+    int len = look_ahead(*str, pred);
+    if(len == 0) {
+        return 0;
+    }
+
+    *str += len;
+    return 1;
+}
+
+static int try_ex_skip_1(char const **str, Predicate_char pred) {
+    if(!pred(**str)) {
+        return 0;
+    }
+
+    ++*str;
+    return 1;
+}
+
+static int try_ex_skip_char(char const **str, char ch) {
+    if(tolower(**str) != ch) {
+        return 0;
+    }
+
+    ++*str;
+    return 1;
+}
+
+
+static void skip_blank(char const **str) {
+    *str += look_ahead(*str, is_blank);
+}
+
+static int try_parse_immediate_value(char const **str, int *out_val) {
+    /* #1, #-1, #0xFF, #-0xFF */
+    
+    const char *s = *str;
+    skip_blank(&s);
+    if(!try_ex_skip_char(&s, '#')) {
+        return 0;
+    }
+
+    int sign = try_ex_skip_char(&s, '-')? -1: 1;
+    
+    int i;
+    if(try_ex_parse_int_16base(&s, &i) || try_ex_parse_int_10base(&s, &i)) {
+       *out_val = i * sign;
+       *str = s;
+       return 1;
+    }
+
+    return 0;
+}
+
+static int follows_eol(const char *s) {
+    skip_blank(&s);
+    return *s == '\0';
+}
+
+
+
+
 
 
 /* unit test */
@@ -340,7 +719,16 @@ static void verify_parse_raw_string(const char *input, const char *expect) {
     assert(eq);
 }
 
+static void verify_parse_rx_imm_eol(const char *input, int expect_rx, int expect_imm) {
+    int actual_rx, actual_imm;
+    int success = try_parse_rx_imm_eol(&input, &actual_rx, &actual_imm);
+    assert(success && expect_rx == actual_rx && expect_imm == actual_imm);
+}
+
 void parser_test() {
+
+    verify_parse_rx_imm_eol("r1, #0x10", 1, 0x10);
+
     verify_parse_one("mov", "mov", "");
     verify_parse_one(" mov, ", "mov", ", ");
 

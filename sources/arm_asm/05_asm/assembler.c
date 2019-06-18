@@ -232,13 +232,13 @@ static void asm_single_data_transfer(Emitter *emitter, int mnemonic, const char 
 
 static void asm_one(Emitter *emitter, const char *s) {
 
-    if(follows_eof(s)) {
+    if(follows_eol(s)) {
         /* blank line */
         return;
     }
 
     Substring one = {0};
-    if(!parse_one(&s, &one)) {
+    if(!try_parse_one(&s, &one)) {
         assert_fail("UNKNOWN ASSEMBLY");
     }
 
@@ -251,56 +251,57 @@ static void asm_one(Emitter *emitter, const char *s) {
 
     int mnemonic = to_mnemonic_symbol(&one);
     if(mnemonic == RAW) {
-        if(follows_raw_word(s)) {
-            int word;
-            parse_raw_word(&s, &word);
-            eof(&s);
+        int word;
+        if(try_parse_imm_eol(&s, &word)) {
             emitter_emit_word(emitter, word);
             return;
         }
 
         char s_buf[1024];
-        parse_raw_string(&s, s_buf);
-        eof(&s);
-        emitter_emit_string(emitter, s_buf);
-        return;
+        if(try_parse_string_eol(&s, s_buf)) {
+            emitter_emit_string(emitter, s_buf);
+            return;
+        }
     } else if(B == mnemonic || BL == mnemonic || BLE == mnemonic || BNE == mnemonic) {
         int cond = (BLE == mnemonic)? 0xD0000000: (BNE == mnemonic)? 0x10000000: 0xE0000000;
-
         int l_bit = (BL == mnemonic)? 0x01000000: 0;
 
         Substring subs = {0};
-        parse_one(&s, &subs);
-        eof(&s);
-
-        UnresolveAddress r = {
-            .address = emitter_current_address(emitter),
-            .label = to_label_symbol(&subs),
-            .flag = ADDR_Imm_24,
-        };
-        unresolve_address_push(&r);
-        emitter_emit_word(emitter, cond + 0x0A000000 + l_bit);
-        return;
-
+        if(try_parse_label_eol(&s, &subs)) {
+            UnresolveAddress r = {
+                .address = emitter_current_address(emitter),
+                .label = to_label_symbol(&subs),
+                .flag = ADDR_Imm_24,
+            };
+            unresolve_address_push(&r);
+            emitter_emit_word(emitter, cond + 0x0A000000 + l_bit);
+            return;
+        }
     } else if (STMDB == mnemonic || LDMIA == mnemonic) {
         /* Block Data Transfer */
 
-        int cond = 0xE0000000;
-        int p_bit = (STMDB == mnemonic)? 0x01000000: 0;
-        int u_bit = (LDMIA == mnemonic)? 0x00800000: 0;
+        int cond = 0xE;
+        int p_bit = (STMDB == mnemonic)? 1: 0;
+        int u_bit = (LDMIA == mnemonic)? 1: 0;
         int s_bit = 0;
-        int l_bit = (LDMIA == mnemonic)? 0x00100000: 0;
-
+        int l_bit = (LDMIA == mnemonic)? 1: 0;
 
         int rn;
-        parse_register(&s, &rn);
-        int w_bit =  try_skip_bang(&s)? 0x00200000: 0;
-        skip_comma(&s);
-
+        int w_bit;
         int reg_list;
-        parse_register_list(&s, &reg_list);
-        emitter_emit_word(emitter, cond + 0x08000000 + p_bit + u_bit + s_bit + w_bit + l_bit + (rn << 16) + reg_list);
-        return;
+        if(try_parse_rn_register_list_eol(&s, &rn, &w_bit, &reg_list)) {
+            emitter_emit_word(emitter, 
+                    (cond << 28)
+                    + 0x08000000 
+                    + (p_bit << 24)
+                    + (u_bit << 23) 
+                    + (s_bit << 22) 
+                    + (w_bit << 21)
+                    + (l_bit << 20)
+                    + (rn << 16) 
+                    + reg_list);
+            return;
+        }
     } else if(LDR == mnemonic || STR == mnemonic || LDRB == mnemonic) {
         asm_single_data_transfer(emitter, mnemonic, s);
         return;
